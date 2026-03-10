@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Agregar Documento · SII Normativa</title>
+<link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@600;700&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0e0e0e;--s:#161616;--s2:#1e1e1e;--ink:#f0ece4;--ink2:#b8b0a4;--muted:#6b6460;--rule:#2a2a2a;--gold:#c8991e;--gold-lt:#e8b83a;--green:#3abf6a;--red:#bf3a3a}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink)}
+header{background:var(--s);border-bottom:1px solid var(--rule);display:flex;align-items:center;justify-content:space-between;padding:0 1.5rem;height:52px}
+.logo{display:flex;align-items:center;gap:10px;text-decoration:none}
+.logo-badge{font-family:'DM Mono',monospace;font-size:10px;padding:3px 8px;border:1px solid var(--gold);border-radius:3px;color:var(--gold);letter-spacing:1px}
+.logo-name{font-family:'Crimson Pro',serif;font-size:18px;font-weight:600;color:var(--ink)}
+nav a{padding:5px 12px;border-radius:3px;font-size:12px;font-weight:500;text-decoration:none;color:var(--ink2)}
+nav a.active{color:var(--gold)}
+main{max-width:760px;margin:0 auto;padding:32px 1.5rem 80px}
+h1{font-family:'Crimson Pro',serif;font-size:26px;font-weight:700;margin-bottom:6px}
+.sub{color:var(--muted);font-size:13px;margin-bottom:28px}
+.card{background:var(--s);border:1px solid var(--rule);border-radius:5px;overflow:hidden;margin-bottom:16px}
+.ch{background:var(--s2);border-bottom:1px solid var(--rule);padding:10px 16px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--gold);text-transform:uppercase}
+.cb{padding:20px;display:grid;gap:14px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.fg{display:flex;flex-direction:column;gap:5px}
+label{font-size:10px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+input,select,textarea{width:100%;padding:8px 10px;background:var(--s2);border:1px solid var(--rule);border-radius:3px;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--ink);outline:none;transition:border-color .2s;appearance:none}
+input:focus,select:focus,textarea:focus{border-color:var(--gold)}
+select option{background:var(--s)}
+textarea{resize:vertical;min-height:120px;font-size:12px;line-height:1.7}
+.btn{padding:10px 20px;border-radius:3px;font-size:13px;font-weight:600;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all .15s;font-family:'DM Sans',sans-serif}
+.btn-gold{background:var(--gold);color:#000}.btn-gold:hover{background:var(--gold-lt)}
+.toast{position:fixed;bottom:20px;right:20px;padding:10px 18px;border-radius:3px;font-size:13px;font-weight:600;transform:translateY(40px);opacity:0;transition:all .25s;z-index:400}
+.ok{background:var(--green);color:#000}.err{background:var(--red);color:#fff}
+.show{transform:translateY(0);opacity:1}
+</style>
+</head>
+<body>
+<header>
+  <a href="/" class="logo"><span class="logo-badge">SII</span><span class="logo-name">Normativa</span></a>
+  <nav>
+    <a href="/">Búsqueda</a>
+    <a href="/scraper">Scraper</a>
+    <a href="/agregar" class="active">+ Agregar</a>
+  </nav>
+</header>
+<main>
+  <h1>Agregar documento manualmente</h1>
+  <p class="sub">Para documentos que no están en el SII digital o que deseas ingresar con clasificación personalizada.</p>
+
+  <div class="card">
+    <div class="ch">Identificación</div>
+    <div class="cb">
+      <div class="grid2">
+        <div class="fg"><label>Tipo *</label>
+          <select id="tipo">
+            <option value="circular">Circular</option>
+            <option value="oficio">Oficio</option>
+            <option value="resolucion">Resolución Exenta</option>
+          </select>
+        </div>
+        <div class="fg"><label>Número</label><input id="numero" placeholder="Ej: 31"></div>
+      </div>
+      <div class="grid2">
+        <div class="fg"><label>Año *</label><input id="anio" type="number" placeholder="2024" min="1980" max="2025"></div>
+        <div class="fg"><label>Fecha (YYYY-MM-DD)</label><input id="fecha" type="date"></div>
+      </div>
+      <div class="fg"><label>Título *</label><input id="titulo" placeholder="Imparte instrucciones sobre…"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="ch">Clasificación</div>
+    <div class="cb">
+      <div class="grid2">
+        <div class="fg"><label>Materia principal</label>
+          <select id="materia">
+            <option value="">Sin clasificar</option>
+            {% for m in materias %}<option>{{ m }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="fg"><label>Leyes citadas</label>
+          <select id="leyes" multiple style="height:auto;min-height:80px">
+            {% for l in leyes %}<option>{{ l }}</option>{% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="fg"><label>Palabras clave (separadas por coma)</label>
+        <input id="palabras" placeholder="artículo 31, gastos necesarios, renta efectiva">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="ch">Contenido</div>
+    <div class="cb">
+      <div class="fg"><label>Resumen ejecutivo</label>
+        <textarea id="resumen" placeholder="Descripción breve del contenido y alcance del documento…" style="min-height:80px"></textarea>
+      </div>
+      <div class="fg"><label>Texto completo</label>
+        <textarea id="contenido" placeholder="Pega aquí el texto del documento…" style="min-height:200px"></textarea>
+      </div>
+      <div class="fg"><label>URL en SII.cl</label>
+        <input id="url" placeholder="https://www.sii.cl/normativa_legislacion/…">
+      </div>
+    </div>
+  </div>
+
+  <button class="btn btn-gold" onclick="guardar()">💾 Guardar documento</button>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+async function guardar(){
+  const leyes_sel = [...document.getElementById('leyes').selectedOptions].map(o=>o.value);
+  const d = {
+    tipo:          document.getElementById('tipo').value,
+    numero:        document.getElementById('numero').value,
+    anio:          parseInt(document.getElementById('anio').value)||null,
+    fecha:         document.getElementById('fecha').value||null,
+    titulo:        document.getElementById('titulo').value,
+    materia:       document.getElementById('materia').value||null,
+    leyes_citadas: JSON.stringify(leyes_sel),
+    palabras_clave:document.getElementById('palabras').value||null,
+    resumen:       document.getElementById('resumen').value||null,
+    contenido:     document.getElementById('contenido').value||null,
+    url_sii:       document.getElementById('url').value||null,
+    subtema:       null, articulos_clave: null,
+  };
+  if(!d.titulo||!d.anio){ alert('Título y año son obligatorios'); return; }
+  const r = await fetch('/agregar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
+  const res = await r.json();
+  const t = document.getElementById('toast');
+  if(res.ok){
+    t.textContent = '✓ Guardado correctamente'; t.className='toast ok show';
+    setTimeout(()=>t.classList.remove('show'),3000);
+  } else {
+    t.textContent = 'Error: '+res.error; t.className='toast err show';
+    setTimeout(()=>t.classList.remove('show'),4000);
+  }
+}
+</script>
+</body>
+</html>
