@@ -1,22 +1,29 @@
-"""
-SII Normativa V2.0 — Sistema completo con scraping real
-Incluye: Flask app + scheduler diario + panel de control
+﻿"""
+TaxLab IA - Fase A sobre Flask + SQLite.
+Mantiene la base documental y los endpoints legacy, y agrega la navegacion
+/app, /admin, casos basicos y el endpoint inicial /api/chat.
 """
 
-from flask import Flask, render_template, request, jsonify, Response, stream_with_context, send_file
-import sqlite3, os, json, re, hashlib, threading, logging
+from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for
+import sqlite3
+import os
+import json
+import re
+import hashlib
+import threading
+import logging
 from datetime import datetime, date
+
+from migraciones import run_migrations
+from rag import responder_consulta_tributaria
 
 app = Flask(__name__)
 BASE = os.path.dirname(os.path.abspath(__file__))
-DB   = os.path.join(BASE, 'data', 'sii_normativa.db')
+DB = os.path.join(BASE, 'data', 'sii_normativa.db')
 
-# ── Logging ──────────────────────────────────────────────────────────────
-logging.basicConfig(level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(message)s')
-log = logging.getLogger('sii_app')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
+log = logging.getLogger('taxlab_app')
 
-# ── Estado global del scraper ─────────────────────────────────────────────
 scraper_status = {
     'running': False,
     'messages': [],
@@ -28,19 +35,25 @@ scraper_status = {
 }
 _lock = threading.Lock()
 
+
 def push_msg(msg: str, ok: bool = True, total: int = 0):
     with _lock:
         scraper_status['messages'].append({
-            'msg': msg, 'ok': ok, 'ts': datetime.now().isoformat()
+            'msg': msg,
+            'ok': ok,
+            'ts': datetime.now().isoformat(),
         })
-        if total > 0: scraper_status['total'] = total
-        if msg.startswith('✅'): scraper_status['nuevos'] += 1
-        if msg.startswith('⚠'): scraper_status['errores'] += 1
+        if total > 0:
+            scraper_status['total'] = total
+        if msg.startswith('OK') or msg.startswith('ok') or msg.startswith('Nuevo') or msg.startswith('✔') or msg.startswith('✅'):
+            scraper_status['nuevos'] += 1
+        if msg.startswith('WARN') or msg.startswith('Error') or msg.startswith('ERROR') or msg.startswith('⚠'):
+            scraper_status['errores'] += 1
         scraper_status['procesados'] += 1
         if len(scraper_status['messages']) > 500:
             scraper_status['messages'] = scraper_status['messages'][-300:]
 
-# ── Schema ───────────────────────────────────────────────────────────────
+
 SCHEMA = """
 PRAGMA journal_mode=WAL;
 CREATE TABLE IF NOT EXISTS documentos (
@@ -74,34 +87,30 @@ CREATE VIRTUAL TABLE IF NOT EXISTS docs_fts USING fts5(
     tokenize='unicode61 remove_diacritics 1'
 );
 CREATE TRIGGER IF NOT EXISTS docs_ai AFTER INSERT ON documentos BEGIN
-    INSERT INTO docs_fts(rowid,titulo,materia,subtema,contenido,resumen,
-                         palabras_clave,leyes_citadas,articulos_clave)
-    VALUES(new.id,new.titulo,new.materia,new.subtema,new.contenido,new.resumen,
-           new.palabras_clave,new.leyes_citadas,new.articulos_clave);
+    INSERT INTO docs_fts(rowid, titulo, materia, subtema, contenido, resumen, palabras_clave, leyes_citadas, articulos_clave)
+    VALUES(new.id, new.titulo, new.materia, new.subtema, new.contenido, new.resumen, new.palabras_clave, new.leyes_citadas, new.articulos_clave);
 END;
 CREATE TRIGGER IF NOT EXISTS docs_ad AFTER DELETE ON documentos BEGIN
-    INSERT INTO docs_fts(docs_fts,rowid,titulo,materia,subtema,contenido,resumen,
-                         palabras_clave,leyes_citadas,articulos_clave)
-    VALUES('delete',old.id,old.titulo,old.materia,old.subtema,old.contenido,old.resumen,
-           old.palabras_clave,old.leyes_citadas,old.articulos_clave);
+    INSERT INTO docs_fts(docs_fts, rowid, titulo, materia, subtema, contenido, resumen, palabras_clave, leyes_citadas, articulos_clave)
+    VALUES('delete', old.id, old.titulo, old.materia, old.subtema, old.contenido, old.resumen, old.palabras_clave, old.leyes_citadas, old.articulos_clave);
 END;
 CREATE TABLE IF NOT EXISTS articulos_idx (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    doc_id     INTEGER REFERENCES documentos(id) ON DELETE CASCADE,
-    ley        TEXT,
-    articulo   TEXT
+    id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    doc_id   INTEGER REFERENCES documentos(id) ON DELETE CASCADE,
+    ley      TEXT,
+    articulo TEXT
 );
-CREATE INDEX IF NOT EXISTS idx_art_ley  ON articulos_idx(ley, articulo);
+CREATE INDEX IF NOT EXISTS idx_art_ley ON articulos_idx(ley, articulo);
 CREATE INDEX IF NOT EXISTS idx_doc_tipo ON documentos(tipo, anio);
 CREATE INDEX IF NOT EXISTS idx_doc_hash ON documentos(hash_md5);
 CREATE TABLE IF NOT EXISTS judicial_docs (
-    doc_id       INTEGER PRIMARY KEY REFERENCES documentos(id) ON DELETE CASCADE,
-    sii_id       INTEGER UNIQUE,
-    tipo_codigo  TEXT,
-    corte        TEXT,
-    tribunal     TEXT,
-    pdf_local    TEXT,
-    html_local   TEXT
+    doc_id      INTEGER PRIMARY KEY REFERENCES documentos(id) ON DELETE CASCADE,
+    sii_id      INTEGER UNIQUE,
+    tipo_codigo TEXT,
+    corte       TEXT,
+    tribunal    TEXT,
+    pdf_local   TEXT,
+    html_local  TEXT
 );
 CREATE TABLE IF NOT EXISTS judicial_relaciones (
     id               INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -111,10 +120,10 @@ CREATE TABLE IF NOT EXISTS judicial_relaciones (
     nota             TEXT,
     UNIQUE(doc_id, cuerpo_normativo, articulo, nota)
 );
-CREATE INDEX IF NOT EXISTS idx_judicial_corte    ON judicial_docs(corte);
+CREATE INDEX IF NOT EXISTS idx_judicial_corte ON judicial_docs(corte);
 CREATE INDEX IF NOT EXISTS idx_judicial_tribunal ON judicial_docs(tribunal);
-CREATE INDEX IF NOT EXISTS idx_judicial_cuerpo   ON judicial_relaciones(cuerpo_normativo);
-CREATE INDEX IF NOT EXISTS idx_judicial_art      ON judicial_relaciones(articulo);
+CREATE INDEX IF NOT EXISTS idx_judicial_cuerpo ON judicial_relaciones(cuerpo_normativo);
+CREATE INDEX IF NOT EXISTS idx_judicial_art ON judicial_relaciones(articulo);
 CREATE TABLE IF NOT EXISTS historial (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     termino    TEXT,
@@ -124,8 +133,11 @@ CREATE TABLE IF NOT EXISTS historial (
 );
 CREATE TABLE IF NOT EXISTS scraper_log (
     id       INTEGER PRIMARY KEY AUTOINCREMENT,
-    tipo     TEXT, anio INTEGER, numero TEXT,
-    estado   TEXT, url TEXT,
+    tipo     TEXT,
+    anio     INTEGER,
+    numero   TEXT,
+    estado   TEXT,
+    url      TEXT,
     fecha    TEXT DEFAULT (datetime('now'))
 );
 CREATE TABLE IF NOT EXISTS scheduler_config (
@@ -135,389 +147,887 @@ CREATE TABLE IF NOT EXISTS scheduler_config (
 """
 
 MATERIAS = [
-    'IVA','Renta','Timbre','Herencias','Bienes Raíces','Ganancias de Capital',
-    'Gastos Necesarios','Pro Pyme','Renta Atribuida','Régimen Semi Integrado',
-    'FUT','RAI','SAC','DDAN','REX','Impuesto Adicional',
-    'Impuesto Global Complementario','Segunda Categoría','Teletrabajo',
-    'Servicios Digitales','Exportaciones','Facturas','Contabilidad',
-    'Depreciación','Corrección Monetaria','Fiscalización','Tasación',
-    'Citación','Liquidación','Giro','Prescripción','Recursos',
-    'Tribunal Tributario','PPMO','PPM','F29','F22',
+    'IVA', 'Renta', 'Timbre', 'Herencias', 'Bienes Raices', 'Ganancias de Capital',
+    'Gastos Necesarios', 'Pro Pyme', 'Renta Atribuida', 'Regimen Semi Integrado',
+    'FUT', 'RAI', 'SAC', 'DDAN', 'REX', 'Impuesto Adicional',
+    'Impuesto Global Complementario', 'Segunda Categoria', 'Teletrabajo',
+    'Servicios Digitales', 'Exportaciones', 'Facturas', 'Contabilidad',
+    'Depreciacion', 'Correccion Monetaria', 'Fiscalizacion', 'Tasacion',
+    'Citacion', 'Liquidacion', 'Giro', 'Prescripcion', 'Recursos',
+    'Tribunal Tributario', 'PPMO', 'PPM', 'F29', 'F22',
 ]
+LEYES = ['LIR', 'LIVS', 'CT', 'LTE', 'LH', 'LMT', 'LRT']
 
-LEYES = ['LIR','LIVS','CT','LTE','LH','LMT','LRT']
 
 def get_db():
     conn = sqlite3.connect(DB)
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute('PRAGMA journal_mode=WAL')
     return conn
+
 
 def init_db():
     os.makedirs(os.path.dirname(DB), exist_ok=True)
     conn = get_db()
-    for stmt in SCHEMA.split(';'):
-        s = stmt.strip()
-        if s:
-            try: conn.execute(s)
-            except Exception as e:
-                if 'already exists' not in str(e): pass
-    conn.commit(); conn.close()
-    log.info("✅ Base de datos inicializada")
+    try:
+        conn.executescript(SCHEMA)
+        conn.commit()
+    finally:
+        conn.close()
+    cambios = run_migrations(DB)
+    if cambios:
+        log.info('Migraciones aplicadas: %s', ', '.join(cambios))
+    log.info('Base de datos inicializada')
+
+
+def safe_json_loads(value, default=None):
+    if default is None:
+        default = []
+    if not value:
+        return list(default) if isinstance(default, list) else default
+    try:
+        return json.loads(value)
+    except Exception:
+        return list(default) if isinstance(default, list) else default
+
 
 def tipo_formal(tipo):
     return {
-        'circular':'Circular',
-        'oficio':'Oficio',
-        'resolucion':'Resolucion Exenta',
-        'judicial':'Jurisprudencia Judicial',
-    }.get(tipo, tipo.capitalize())
+        'circular': 'Circular',
+        'oficio': 'Oficio',
+        'resolucion': 'Resolucion Exenta',
+        'judicial': 'Jurisprudencia Judicial',
+    }.get(tipo, str(tipo).capitalize())
+
 
 def get_judicial_asset_path(stored_path):
     if not stored_path:
         return None
-    norm = stored_path.replace('/', os.sep)
-    return norm if os.path.isabs(norm) else os.path.join(BASE, norm)
+    normalized = stored_path.replace('/', os.sep)
+    return normalized if os.path.isabs(normalized) else os.path.join(BASE, normalized)
 
-# ── Rutas principales ─────────────────────────────────────────────────────
+
+def get_total_docs():
+    conn = get_db()
+    try:
+        return conn.execute('SELECT COUNT(*) FROM documentos').fetchone()[0]
+    finally:
+        conn.close()
+
+
+def get_case_options(conn=None):
+    owns_connection = conn is None
+    conn = conn or get_db()
+    try:
+        rows = conn.execute("SELECT id, nombre, estado FROM casos ORDER BY fecha_modificacion DESC, id DESC").fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        if owns_connection:
+            conn.close()
+
+
+def get_catalog_context():
+    conn = get_db()
+    try:
+        c = conn.cursor()
+        c.execute('SELECT COUNT(*) FROM documentos')
+        total = c.fetchone()[0]
+
+        c.execute('SELECT tipo, COUNT(*) cnt FROM documentos GROUP BY tipo')
+        por_tipo = {row['tipo']: row['cnt'] for row in c.fetchall()}
+
+        c.execute('SELECT anio, COUNT(*) cnt FROM documentos WHERE anio IS NOT NULL GROUP BY anio ORDER BY anio DESC LIMIT 15')
+        por_anio = [dict(row) for row in c.fetchall()]
+
+        c.execute('SELECT termino, resultados FROM historial ORDER BY fecha DESC LIMIT 8')
+        recientes = [dict(row) for row in c.fetchall()]
+
+        c.execute('SELECT ley, articulo, COUNT(*) cnt FROM articulos_idx GROUP BY ley, articulo ORDER BY cnt DESC LIMIT 15')
+        top_arts = [dict(row) for row in c.fetchall()]
+
+        c.execute("SELECT MAX(fecha_carga) FROM documentos")
+        ultima_actualizacion = c.fetchone()[0]
+
+        try:
+            c.execute("SELECT DISTINCT corte FROM judicial_docs WHERE corte IS NOT NULL AND corte<>'' ORDER BY corte")
+            cortes_judiciales = [row[0] for row in c.fetchall()]
+            c.execute("SELECT DISTINCT cuerpo_normativo FROM judicial_relaciones WHERE cuerpo_normativo IS NOT NULL AND cuerpo_normativo<>'' ORDER BY cuerpo_normativo")
+            cuerpos_judiciales = [row[0] for row in c.fetchall()]
+        except sqlite3.OperationalError:
+            cortes_judiciales, cuerpos_judiciales = [], []
+
+        c.execute('SELECT COUNT(*) FROM casos')
+        total_casos = c.fetchone()[0]
+
+        c.execute("SELECT COUNT(*) FROM scraper_log WHERE estado='ok' AND date(fecha)=date('now')")
+        nuevos_hoy = c.fetchone()[0]
+
+        return {
+            'total': total,
+            'por_tipo': por_tipo,
+            'por_anio': por_anio,
+            'recientes': recientes,
+            'top_arts': top_arts,
+            'materias': MATERIAS,
+            'leyes': LEYES,
+            'cortes_judiciales': cortes_judiciales,
+            'cuerpos_judiciales': cuerpos_judiciales,
+            'anio_actual': date.today().year,
+            'ultima_actualizacion': ultima_actualizacion,
+            'total_casos': total_casos,
+            'nuevos_hoy': nuevos_hoy,
+            'casos': get_case_options(conn),
+        }
+    finally:
+        conn.close()
+
+
+def render_app(template_name, *, active_section, page_title, page_subtitle, **context):
+    shell_total_docs = context.get('total', get_total_docs())
+    return render_template(
+        template_name,
+        active_section=active_section,
+        page_title=page_title,
+        page_subtitle=page_subtitle,
+        shell_total_docs=shell_total_docs,
+        **context,
+    )
+
+def load_document_context(doc_id):
+    conn = get_db()
+    try:
+        c = conn.cursor()
+        c.execute(
+            """
+            SELECT d.*, jd.sii_id, jd.tipo_codigo, jd.corte, jd.tribunal, jd.pdf_local, jd.html_local
+            FROM documentos d
+            LEFT JOIN judicial_docs jd ON jd.doc_id = d.id
+            WHERE d.id = ?
+            """,
+            (doc_id,),
+        )
+        row = c.fetchone()
+        if not row:
+            return None
+
+        doc = dict(row)
+        doc['leyes_citadas'] = safe_json_loads(doc.get('leyes_citadas'))
+        doc['articulos_clave'] = safe_json_loads(doc.get('articulos_clave'))
+        doc['pdf_url'] = f'/documento/{doc_id}/pdf' if doc.get('pdf_local') else None
+
+        judicial_relaciones = []
+        judicial_por_norma = []
+        if doc['tipo'] == 'judicial':
+            c.execute(
+                """
+                SELECT cuerpo_normativo, articulo, nota
+                FROM judicial_relaciones
+                WHERE doc_id = ?
+                ORDER BY cuerpo_normativo, articulo, nota
+                """,
+                (doc_id,),
+            )
+            judicial_relaciones = [dict(r) for r in c.fetchall()]
+            agrupado = {}
+            for relacion in judicial_relaciones:
+                cuerpo = relacion['cuerpo_normativo'] or 'Sin cuerpo normativo'
+                valor = relacion['articulo'] or ''
+                if relacion.get('nota'):
+                    valor = f"{valor} ({relacion['nota']})" if valor else relacion['nota']
+                agrupado.setdefault(cuerpo, []).append(valor or 'Sin articulo')
+            judicial_por_norma = [
+                {'cuerpo_normativo': cuerpo, 'articulos': articulos}
+                for cuerpo, articulos in agrupado.items()
+            ]
+
+        relacionados = []
+        articulos = doc['articulos_clave'][:4]
+        if articulos:
+            placeholders = ','.join(['?'] * len(articulos))
+            c.execute(
+                f"""
+                SELECT DISTINCT d.id, d.tipo, d.numero, d.anio, d.titulo, d.referencia, d.materia, d.paginas
+                FROM articulos_idx ai
+                JOIN documentos d ON d.id = ai.doc_id
+                WHERE ai.articulo IN ({placeholders}) AND d.id != ?
+                ORDER BY d.anio DESC
+                LIMIT 8
+                """,
+                articulos + [doc_id],
+            )
+            relacionados = [dict(row) for row in c.fetchall()]
+
+        c.execute(
+            """
+            SELECT id, tipo, numero, anio, titulo, referencia, vigente
+            FROM documentos
+            WHERE tipo = ? AND numero = ? AND id != ?
+            ORDER BY anio DESC
+            """,
+            (doc['tipo'], doc['numero'], doc_id),
+        )
+        historial = [dict(row) for row in c.fetchall()]
+
+        return {
+            'doc': doc,
+            'relacionados': relacionados,
+            'historial': historial,
+            'judicial_relaciones': judicial_relaciones,
+            'judicial_por_norma': judicial_por_norma,
+        }
+    finally:
+        conn.close()
+
+
+def load_scraper_context():
+    conn = get_db()
+    try:
+        c = conn.cursor()
+        c.execute('SELECT * FROM scraper_log ORDER BY fecha DESC LIMIT 100')
+        logs = [dict(row) for row in c.fetchall()]
+        c.execute(
+            """
+            SELECT tipo, anio, COUNT(*) cnt,
+                   SUM(CASE WHEN estado='ok' THEN 1 ELSE 0 END) ok
+            FROM scraper_log
+            GROUP BY tipo, anio
+            ORDER BY anio DESC
+            LIMIT 30
+            """
+        )
+        resumen = [dict(row) for row in c.fetchall()]
+        c.execute("SELECT value FROM scheduler_config WHERE key='ultima_ejecucion'")
+        row = c.fetchone()
+        ultima_ejecucion = row[0] if row else 'Nunca'
+        return {
+            'logs': logs,
+            'resumen': resumen,
+            'ultima_ejecucion': ultima_ejecucion,
+            'status': scraper_status,
+            'anio_actual': date.today().year,
+        }
+    finally:
+        conn.close()
+
+
+def get_case_overview():
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            """
+            SELECT c.*, 
+                   COUNT(n.id) AS total_notas,
+                   SUM(CASE WHEN n.doc_id IS NOT NULL THEN 1 ELSE 0 END) AS total_docs
+            FROM casos c
+            LEFT JOIN caso_notas n ON n.caso_id = c.id
+            GROUP BY c.id
+            ORDER BY c.fecha_modificacion DESC, c.id DESC
+            """
+        ).fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        conn.close()
+
+
+def get_case_detail(caso_id):
+    conn = get_db()
+    try:
+        c = conn.cursor()
+        c.execute('SELECT * FROM casos WHERE id = ?', (caso_id,))
+        caso = c.fetchone()
+        if not caso:
+            return None, []
+        c.execute(
+            """
+            SELECT n.*, d.titulo AS doc_titulo, d.referencia AS doc_referencia
+            FROM caso_notas n
+            LEFT JOIN documentos d ON d.id = n.doc_id
+            WHERE n.caso_id = ?
+            ORDER BY n.fecha DESC, n.id DESC
+            """,
+            (caso_id,),
+        )
+        notas = [dict(row) for row in c.fetchall()]
+        return dict(caso), notas
+    finally:
+        conn.close()
+
+
+def get_doc_preview(doc_id):
+    if not doc_id:
+        return None
+    conn = get_db()
+    try:
+        row = conn.execute(
+            'SELECT id, titulo, referencia, tipo, anio FROM documentos WHERE id = ?',
+            (doc_id,),
+        ).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
 @app.route('/')
 def index():
-    conn = get_db(); c = conn.cursor()
-    c.execute("SELECT COUNT(*) FROM documentos"); total = c.fetchone()[0]
-    c.execute("SELECT tipo,COUNT(*) cnt FROM documentos GROUP BY tipo")
-    por_tipo = {r['tipo']:r['cnt'] for r in c.fetchall()}
-    c.execute("SELECT anio,COUNT(*) cnt FROM documentos WHERE anio IS NOT NULL GROUP BY anio ORDER BY anio DESC LIMIT 15")
-    por_anio = [dict(r) for r in c.fetchall()]
-    c.execute("SELECT termino,resultados FROM historial ORDER BY fecha DESC LIMIT 8")
-    recientes = [dict(r) for r in c.fetchall()]
-    c.execute("SELECT ley,articulo,COUNT(*) cnt FROM articulos_idx GROUP BY ley,articulo ORDER BY cnt DESC LIMIT 15")
-    top_arts = [dict(r) for r in c.fetchall()]
-    c.execute("SELECT MAX(fecha_carga) FROM documentos WHERE fuente LIKE 'sii_%' OR fuente='scraper'")
-    ultima_actualizacion = c.fetchone()[0]
-    try:
-        c.execute("SELECT DISTINCT corte FROM judicial_docs WHERE corte IS NOT NULL AND corte<>'' ORDER BY corte")
-        cortes_judiciales = [r[0] for r in c.fetchall()]
-        c.execute("SELECT DISTINCT cuerpo_normativo FROM judicial_relaciones WHERE cuerpo_normativo IS NOT NULL AND cuerpo_normativo<>'' ORDER BY cuerpo_normativo")
-        cuerpos_judiciales = [r[0] for r in c.fetchall()]
-    except sqlite3.OperationalError:
-        cortes_judiciales, cuerpos_judiciales = [], []
-    conn.close()
-    return render_template('index.html', total=total, por_tipo=por_tipo,
-        por_anio=por_anio, recientes=recientes, top_arts=top_arts,
-        materias=MATERIAS, leyes=LEYES,
-        cortes_judiciales=cortes_judiciales,
-        cuerpos_judiciales=cuerpos_judiciales,
-        anio_actual=date.today().year,
-        ultima_actualizacion=ultima_actualizacion)
+    return redirect(url_for('app_search'))
+
+
+@app.route('/app')
+def app_dashboard():
+    context = get_catalog_context()
+    return render_app(
+        'dashboard.html',
+        active_section='dashboard',
+        page_title='TaxLab IA',
+        page_subtitle='Dashboard inicial para separar base publica SII, asistente con evidencia, casos privados, toolkit y paneles admin sin romper el producto actual.',
+        **context,
+    )
+
+
+@app.route('/app/buscar')
+def app_search():
+    context = get_catalog_context()
+    return render_app(
+        'index.html',
+        active_section='buscar',
+        page_title='Base publica SII',
+        page_subtitle='Busqueda documental sobre normativa tributaria y jurisprudencia judicial del SII, con filtros y trazabilidad por fuente.',
+        **context,
+    )
+
 
 @app.route('/buscar')
 def buscar():
-    q       = request.args.get('q','').strip()
-    tipo    = request.args.get('tipo','')
-    anio    = request.args.get('anio','')
-    ley     = request.args.get('ley','')
-    materia = request.args.get('materia','')
-    art     = request.args.get('articulo','').strip()
-    corte   = request.args.get('corte','').strip()
-    cuerpo  = request.args.get('cuerpo','').strip()
-    vigente = request.args.get('vigente','').strip()
-    page    = max(1, int(request.args.get('page', 1)))
-    per     = 15
+    q = request.args.get('q', '').strip()
+    tipo = request.args.get('tipo', '')
+    anio = request.args.get('anio', '')
+    ley = request.args.get('ley', '')
+    materia = request.args.get('materia', '')
+    articulo = request.args.get('articulo', '').strip()
+    corte = request.args.get('corte', '').strip()
+    cuerpo = request.args.get('cuerpo', '').strip()
+    vigente = request.args.get('vigente', '').strip()
+    page = max(1, int(request.args.get('page', 1)))
+    per = 15
 
-    conn = get_db(); c = conn.cursor()
-    where, params = [], []
-    joins = "LEFT JOIN judicial_docs jd ON jd.doc_id=d.id LEFT JOIN judicial_relaciones jr ON jr.doc_id=d.id"
+    conn = get_db()
+    try:
+        c = conn.cursor()
+        where = []
+        params = []
+        joins = 'LEFT JOIN judicial_docs jd ON jd.doc_id=d.id LEFT JOIN judicial_relaciones jr ON jr.doc_id=d.id'
 
-    if q:
-        try:
-            fts_q = ' OR '.join(f'"{w}"' if len(w)>3 else w for w in q.split())
-            c.execute('SELECT rowid FROM docs_fts WHERE docs_fts MATCH ? ORDER BY rank LIMIT 500', (fts_q,))
-            ids = [r[0] for r in c.fetchall()]
-        except Exception:
-            ids = []
-        if ids:
-            where.append(f"d.id IN ({','.join(['?']*len(ids))})")
-            params.extend(ids)
-        else:
-            like = f'%{q}%'
-            where.append("(d.titulo LIKE ? OR d.contenido LIKE ? OR d.palabras_clave LIKE ? OR d.resumen LIKE ?)")
-            params.extend([like]*4)
+        if q:
+            try:
+                fts_q = ' OR '.join(f'"{word}"' if len(word) > 3 else word for word in q.split())
+                c.execute('SELECT rowid FROM docs_fts WHERE docs_fts MATCH ? ORDER BY rank LIMIT 500', (fts_q,))
+                ids = [row[0] for row in c.fetchall()]
+            except Exception:
+                ids = []
+            if ids:
+                where.append(f"d.id IN ({','.join(['?'] * len(ids))})")
+                params.extend(ids)
+            else:
+                like = f'%{q}%'
+                where.append('(d.titulo LIKE ? OR d.contenido LIKE ? OR d.palabras_clave LIKE ? OR d.resumen LIKE ?)')
+                params.extend([like] * 4)
 
-    if tipo:
-        where.append("d.tipo=?")
-        params.append(tipo)
-    if anio:
-        where.append("d.anio=?")
-        params.append(int(anio))
-    if ley:
-        where.append("d.leyes_citadas LIKE ?")
-        params.append(f'%"{ley}"%')
-    if materia:
-        where.append("d.materia LIKE ?")
-        params.append(f'%{materia}%')
-    if art:
-        where.append("(d.articulos_clave LIKE ? OR jr.articulo LIKE ?)")
-        params.extend([f'%{art}%', f'%{art}%'])
-    if corte:
-        where.append("jd.corte=?")
-        params.append(corte)
-    if cuerpo:
-        where.append("jr.cuerpo_normativo=?")
-        params.append(cuerpo)
-    if vigente in ('0', '1'):
-        where.append("d.vigente=?")
-        params.append(int(vigente))
+        if tipo:
+            where.append('d.tipo = ?')
+            params.append(tipo)
+        if anio:
+            where.append('d.anio = ?')
+            params.append(int(anio))
+        if ley:
+            where.append('d.leyes_citadas LIKE ?')
+            params.append(f'%"{ley}"%')
+        if materia:
+            where.append('d.materia LIKE ?')
+            params.append(f'%{materia}%')
+        if articulo:
+            where.append('(d.articulos_clave LIKE ? OR jr.articulo LIKE ?)')
+            params.extend([f'%{articulo}%', f'%{articulo}%'])
+        if corte:
+            where.append('jd.corte = ?')
+            params.append(corte)
+        if cuerpo:
+            where.append('jr.cuerpo_normativo = ?')
+            params.append(cuerpo)
+        if vigente in ('0', '1'):
+            where.append('d.vigente = ?')
+            params.append(int(vigente))
 
-    clause = ("WHERE " + " AND ".join(where)) if where else ""
-    base_from = f"FROM documentos d {joins} {clause}"
+        clause = ('WHERE ' + ' AND '.join(where)) if where else ''
+        base_from = f'FROM documentos d {joins} {clause}'
 
-    c.execute(f"SELECT COUNT(*) FROM (SELECT d.id {base_from} GROUP BY d.id)", params)
-    total = c.fetchone()[0]
+        c.execute(f'SELECT COUNT(*) FROM (SELECT d.id {base_from} GROUP BY d.id)', params)
+        total = c.fetchone()[0]
 
-    c.execute(f"""
-        SELECT d.id,d.tipo,d.numero,d.anio,d.fecha,d.titulo,d.materia,
-               d.referencia,d.resumen,d.leyes_citadas,d.articulos_clave,
-               d.vigente,d.paginas,d.chars_texto,d.url_sii,
-               jd.corte,jd.tribunal,jd.tipo_codigo,jd.pdf_local,
-               GROUP_CONCAT(DISTINCT jr.cuerpo_normativo) AS cuerpos_normativos,
-               SUBSTR(d.contenido,1,700) extracto
-        {base_from}
-        GROUP BY d.id
-        ORDER BY COALESCE(d.fecha,'') DESC, d.id DESC
-        LIMIT ? OFFSET ?
-    """, params + [per, (page-1)*per])
-    rows = c.fetchall()
+        c.execute(
+            f"""
+            SELECT d.id, d.tipo, d.numero, d.anio, d.fecha, d.titulo, d.materia,
+                   d.referencia, d.resumen, d.leyes_citadas, d.articulos_clave,
+                   d.vigente, d.paginas, d.chars_texto, d.url_sii,
+                   jd.corte, jd.tribunal, jd.tipo_codigo, jd.pdf_local,
+                   GROUP_CONCAT(DISTINCT jr.cuerpo_normativo) AS cuerpos_normativos,
+                   SUBSTR(d.contenido, 1, 700) AS extracto
+            {base_from}
+            GROUP BY d.id
+            ORDER BY COALESCE(d.fecha, '') DESC, d.id DESC
+            LIMIT ? OFFSET ?
+            """,
+            params + [per, (page - 1) * per],
+        )
+        rows = c.fetchall()
 
-    if q or tipo or ley or art or corte or cuerpo or vigente:
-        try:
-            c.execute("INSERT INTO historial(termino,filtros,resultados) VALUES(?,?,?)",
-                      (q, json.dumps({'tipo':tipo,'ley':ley,'art':art,'corte':corte,'cuerpo':cuerpo,'vigente':vigente}), total))
-            conn.commit()
-        except Exception:
-            pass
-    conn.close()
+        if q or tipo or ley or articulo or corte or cuerpo or vigente or materia or anio:
+            try:
+                c.execute(
+                    'INSERT INTO historial(termino, filtros, resultados) VALUES(?,?,?)',
+                    (
+                        q,
+                        json.dumps({
+                            'tipo': tipo,
+                            'anio': anio,
+                            'ley': ley,
+                            'materia': materia,
+                            'articulo': articulo,
+                            'corte': corte,
+                            'cuerpo': cuerpo,
+                            'vigente': vigente,
+                        }),
+                        total,
+                    ),
+                )
+                conn.commit()
+            except Exception:
+                pass
+    finally:
+        conn.close()
 
     resultados = []
-    for r in rows:
-        extracto = r['resumen'] or r['extracto'] or ''
+    for row in rows:
+        extracto = row['resumen'] or row['extracto'] or ''
         if q:
             for word in q.split():
                 if len(word) > 2:
                     extracto = re.sub(f'(?i)({re.escape(word)})', r'<mark>\1</mark>', extracto)
-        cuerpos_normativos = [x.strip() for x in (r['cuerpos_normativos'] or '').split(',') if x and x.strip()]
+        cuerpos_normativos = [value.strip() for value in (row['cuerpos_normativos'] or '').split(',') if value and value.strip()]
         resultados.append({
-            'id': r['id'], 'tipo': r['tipo'], 'numero': r['numero'],
-            'anio': r['anio'], 'fecha': r['fecha'], 'titulo': r['titulo'],
-            'materia': r['materia'], 'referencia': r['referencia'],
+            'id': row['id'],
+            'tipo': row['tipo'],
+            'numero': row['numero'],
+            'anio': row['anio'],
+            'fecha': row['fecha'],
+            'titulo': row['titulo'],
+            'materia': row['materia'],
+            'referencia': row['referencia'],
             'extracto': extracto[:700] + ('...' if len(extracto) > 700 else ''),
-            'leyes': json.loads(r['leyes_citadas'] or '[]'),
-            'articulos': json.loads(r['articulos_clave'] or '[]')[:5],
-            'vigente': r['vigente'],
-            'paginas': r['paginas'] or 0,
-            'url_sii': r['url_sii'],
-            'corte': r['corte'],
-            'tribunal': r['tribunal'],
-            'tipo_codigo': r['tipo_codigo'],
+            'leyes': safe_json_loads(row['leyes_citadas']),
+            'articulos': safe_json_loads(row['articulos_clave'])[:5],
+            'vigente': row['vigente'],
+            'paginas': row['paginas'] or 0,
+            'url_sii': row['url_sii'],
+            'corte': row['corte'],
+            'tribunal': row['tribunal'],
+            'tipo_codigo': row['tipo_codigo'],
             'cuerpos_normativos': cuerpos_normativos,
-            'pdf_url': f"/documento/{r['id']}/pdf" if r['pdf_local'] else '',
-        })
-
-    return jsonify({'resultados': resultados, 'total': total,
-                    'pagina': page, 'paginas': max(1, (total+per-1)//per)})
-
-@app.route('/documento/<int:doc_id>')
-def ver_documento(doc_id):
-    conn = get_db(); c = conn.cursor()
-    c.execute("""
-        SELECT d.*, jd.sii_id, jd.tipo_codigo, jd.corte, jd.tribunal, jd.pdf_local, jd.html_local
-        FROM documentos d
-        LEFT JOIN judicial_docs jd ON jd.doc_id=d.id
-        WHERE d.id=?
-    """, (doc_id,))
-    row = c.fetchone()
-    if not row:
-        conn.close()
-        return "Documento no encontrado", 404
-    doc = dict(row)
-    doc['leyes_citadas']   = json.loads(doc.get('leyes_citadas') or '[]')
-    doc['articulos_clave'] = json.loads(doc.get('articulos_clave') or '[]')
-    doc['pdf_url'] = f"/documento/{doc_id}/pdf" if doc.get('pdf_local') else None
-
-    judicial_relaciones = []
-    judicial_por_norma = []
-    if doc['tipo'] == 'judicial':
-        c.execute("""
-            SELECT cuerpo_normativo, articulo, nota
-            FROM judicial_relaciones
-            WHERE doc_id=?
-            ORDER BY cuerpo_normativo, articulo, nota
-        """, (doc_id,))
-        judicial_relaciones = [dict(r) for r in c.fetchall()]
-        agrupado = {}
-        for rel in judicial_relaciones:
-            cuerpo = rel['cuerpo_normativo'] or 'Sin cuerpo normativo'
-            valor = rel['articulo'] or ''
-            if rel.get('nota'):
-                valor = f"{valor} ({rel['nota']})" if valor else rel['nota']
-            agrupado.setdefault(cuerpo, []).append(valor or 'Sin articulo')
-        judicial_por_norma = [
-            {'cuerpo_normativo': k, 'articulos': v}
-            for k, v in agrupado.items()
-        ]
-
-    arts = doc['articulos_clave'][:4]
-    relacionados = []
-    if arts:
-        ph = ','.join(['?']*len(arts))
-        c.execute(f"""
-            SELECT DISTINCT d.id,d.tipo,d.numero,d.anio,d.titulo,d.referencia,d.materia,d.paginas
-            FROM articulos_idx ai JOIN documentos d ON d.id=ai.doc_id
-            WHERE ai.articulo IN ({ph}) AND d.id!=?
-            ORDER BY d.anio DESC LIMIT 8
-        """, arts + [doc_id])
-        relacionados = [dict(r) for r in c.fetchall()]
-
-    c.execute("""
-        SELECT id,tipo,numero,anio,titulo,referencia,vigente
-        FROM documentos WHERE tipo=? AND numero=? AND id!=?
-        ORDER BY anio DESC
-    """, (doc['tipo'], doc['numero'], doc_id))
-    historial = [dict(r) for r in c.fetchall()]
-
-    conn.close()
-    return render_template('documento.html', doc=doc,
-                           relacionados=relacionados, historial=historial,
-                           judicial_relaciones=judicial_relaciones,
-                           judicial_por_norma=judicial_por_norma)
-
-@app.route('/documento/<int:doc_id>/pdf')
-def descargar_pdf_documento(doc_id):
-    conn = get_db(); c = conn.cursor()
-    c.execute("""
-        SELECT d.tipo, d.referencia, jd.pdf_local
-        FROM documentos d
-        LEFT JOIN judicial_docs jd ON jd.doc_id=d.id
-        WHERE d.id=?
-    """, (doc_id,))
-    row = c.fetchone()
-    conn.close()
-    if not row or row['tipo'] != 'judicial' or not row['pdf_local']:
-        return "PDF no disponible", 404
-
-    abs_path = get_judicial_asset_path(row['pdf_local'])
-    if not abs_path or not os.path.exists(abs_path):
-        return "PDF no encontrado en disco", 404
-
-    return send_file(abs_path, as_attachment=True, download_name=os.path.basename(abs_path))
-
-@app.route('/api/cita/<int:doc_id>')
-def cita(doc_id):
-    conn = get_db(); c = conn.cursor()
-    c.execute("SELECT * FROM documentos WHERE id=?", (doc_id,))
-    row = c.fetchone()
-    conn.close()
-    r = dict(row)
-    tf = tipo_formal(r['tipo'])
-    resumen_txt = (r.get('resumen') or r.get('contenido') or '')[:400]
-    fecha_fmt = r.get('fecha') or str(r.get('anio',''))
-    mat = r.get('materia') or 'normativa tributaria'
-
-    if r['tipo'] == 'judicial':
-        base_ref = r.get('referencia') or f"{tf} {r.get('numero','')}"
-        return jsonify({
-            'cita_corta':  base_ref,
-            'cita_media':  f"Conforme a lo resuelto en {base_ref}",
-            'cita_larga':  (
-                f"En {base_ref}, de fecha {fecha_fmt}, se sostuvo que: \"{resumen_txt}...\""
-            ),
-            'cita_escrito': (
-                f"En apoyo de lo expuesto, cabe citar {base_ref}, donde se razona que: \"{resumen_txt}...\". "
-                f"El texto integro y su respaldo documental se encuentran disponibles en {r.get('url_sii','www.sii.cl')}."
-            ),
-            'url': r.get('url_sii'), 'referencia': base_ref
+            'pdf_url': f"/documento/{row['id']}/pdf" if row['pdf_local'] else '',
         })
 
     return jsonify({
-        'cita_corta':  f"{tf} N{r['numero']} de {r['anio']} del SII",
-        'cita_media':  f"Conforme a lo senalado por el SII en {tf} N{r['numero']} de {r['anio']}, en materia de {mat}",
-        'cita_larga':  (
-            f"En virtud de lo establecido en {tf} N{r['numero']} de fecha {fecha_fmt}, "
-            f"emanada del Servicio de Impuestos Internos, en materia de {mat}, "
-            f"dicho organismo ha senalado que: \"{resumen_txt}...\""
+        'resultados': resultados,
+        'total': total,
+        'pagina': page,
+        'paginas': max(1, (total + per - 1) // per),
+    })
+
+@app.route('/documento/<int:doc_id>')
+def ver_documento_legacy(doc_id):
+    return redirect(url_for('app_documento', doc_id=doc_id))
+
+
+@app.route('/app/documento/<int:doc_id>')
+def app_documento(doc_id):
+    context = load_document_context(doc_id)
+    if not context:
+        return 'Documento no encontrado', 404
+    catalog_context = get_catalog_context()
+    return render_app(
+        'documento.html',
+        active_section='buscar',
+        page_title='Detalle documental',
+        page_subtitle='Ficha canonica del documento con citas, relacionados, fuente y opciones de guardado en casos.',
+        total=catalog_context['total'],
+        casos=catalog_context['casos'],
+        anio_actual=catalog_context['anio_actual'],
+        **context,
+    )
+
+
+@app.route('/documento/<int:doc_id>/pdf')
+def descargar_pdf_documento(doc_id):
+    conn = get_db()
+    try:
+        row = conn.execute(
+            """
+            SELECT d.tipo, d.referencia, jd.pdf_local
+            FROM documentos d
+            LEFT JOIN judicial_docs jd ON jd.doc_id = d.id
+            WHERE d.id = ?
+            """,
+            (doc_id,),
+        ).fetchone()
+    finally:
+        conn.close()
+
+    if not row or row['tipo'] != 'judicial' or not row['pdf_local']:
+        return 'PDF no disponible', 404
+
+    abs_path = get_judicial_asset_path(row['pdf_local'])
+    if not abs_path or not os.path.exists(abs_path):
+        return 'PDF no encontrado en disco', 404
+
+    return send_file(abs_path, as_attachment=True, download_name=os.path.basename(abs_path))
+
+
+@app.route('/api/cita/<int:doc_id>')
+def cita(doc_id):
+    conn = get_db()
+    try:
+        row = conn.execute('SELECT * FROM documentos WHERE id = ?', (doc_id,)).fetchone()
+    finally:
+        conn.close()
+    if not row:
+        return jsonify({'error': 'Documento no encontrado'}), 404
+
+    doc = dict(row)
+    tipo_nombre = tipo_formal(doc['tipo'])
+    resumen_txt = (doc.get('resumen') or doc.get('contenido') or '')[:400]
+    fecha_fmt = doc.get('fecha') or str(doc.get('anio', ''))
+    materia = doc.get('materia') or 'normativa tributaria'
+
+    if doc['tipo'] == 'judicial':
+        base_ref = doc.get('referencia') or f"{tipo_nombre} {doc.get('numero', '')}"
+        return jsonify({
+            'cita_corta': base_ref,
+            'cita_media': f'Conforme a lo resuelto en {base_ref}',
+            'cita_larga': f'En {base_ref}, de fecha {fecha_fmt}, se sostuvo que: "{resumen_txt}..."',
+            'cita_escrito': (
+                f'En apoyo de lo expuesto, cabe citar {base_ref}, donde se razona que: "{resumen_txt}...". '
+                f'El texto integro y su respaldo documental se encuentran disponibles en {doc.get("url_sii", "www.sii.cl")}. '
+            ),
+            'url': doc.get('url_sii'),
+            'referencia': base_ref,
+        })
+
+    return jsonify({
+        'cita_corta': f'{tipo_nombre} N{doc.get("numero", "")} de {doc.get("anio", "")} del SII',
+        'cita_media': f'Conforme a lo senalado por el SII en {tipo_nombre} N{doc.get("numero", "")} de {doc.get("anio", "")}, en materia de {materia}',
+        'cita_larga': (
+            f'En virtud de lo establecido en {tipo_nombre} N{doc.get("numero", "")} de fecha {fecha_fmt}, '
+            f'emanada del Servicio de Impuestos Internos, en materia de {materia}, dicho organismo ha senalado que: "{resumen_txt}..."'
         ),
         'cita_escrito': (
-            f"En este contexto, cabe traer a colacion lo senalado por el SII en su {tf} N{r['numero']} "
-            f"de {r['anio']} (ref. {r.get('referencia','')}), donde se establece que: "
-            f"\"{resumen_txt}...\". "
-            f"Dicha instruccion administrativa se encuentra disponible en {r.get('url_sii','www.sii.cl')}."
+            f'En este contexto, cabe traer a colacion lo senalado por el SII en su {tipo_nombre} N{doc.get("numero", "")} '
+            f'de {doc.get("anio", "")} (ref. {doc.get("referencia", "")}), donde se establece que: "{resumen_txt}...". '
+            f'Dicha instruccion administrativa se encuentra disponible en {doc.get("url_sii", "www.sii.cl")}. '
         ),
-        'url': r.get('url_sii'), 'referencia': r.get('referencia')
+        'url': doc.get('url_sii'),
+        'referencia': doc.get('referencia'),
     })
+
 
 @app.route('/api/articulo')
 def por_articulo():
-    ley = request.args.get('ley','')
-    art = request.args.get('art','')
-    conn = get_db(); c = conn.cursor()
-    c.execute("""
-        SELECT DISTINCT d.id,d.tipo,d.numero,d.anio,d.titulo,d.referencia,d.materia,d.resumen
-        FROM articulos_idx ai JOIN documentos d ON d.id=ai.doc_id
-        WHERE (?='' OR ai.ley=?) AND (?='' OR ai.articulo LIKE ?)
-        ORDER BY d.anio DESC LIMIT 100
-    """, (ley,ley, art,f'%{art}%'))
-    docs = [dict(r) for r in c.fetchall()]
-    conn.close()
+    ley = request.args.get('ley', '')
+    articulo = request.args.get('art', '')
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            """
+            SELECT DISTINCT d.id, d.tipo, d.numero, d.anio, d.titulo, d.referencia, d.materia, d.resumen
+            FROM articulos_idx ai
+            JOIN documentos d ON d.id = ai.doc_id
+            WHERE (?='' OR ai.ley=?) AND (?='' OR ai.articulo LIKE ?)
+            ORDER BY d.anio DESC
+            LIMIT 100
+            """,
+            (ley, ley, articulo, f'%{articulo}%'),
+        ).fetchall()
+        docs = [dict(row) for row in rows]
+    finally:
+        conn.close()
     return jsonify({'docs': docs, 'total': len(docs)})
+
 
 @app.route('/api/stats')
 def stats():
-    conn = get_db(); c = conn.cursor()
-    c.execute("SELECT COUNT(*) FROM documentos"); total = c.fetchone()[0]
-    c.execute("SELECT tipo,COUNT(*) cnt FROM documentos GROUP BY tipo")
-    por_tipo = dict(c.fetchall())
-    c.execute("SELECT anio,COUNT(*) cnt FROM documentos GROUP BY anio ORDER BY anio DESC LIMIT 10")
-    por_anio = dict(c.fetchall())
-    c.execute("SELECT MAX(fecha_carga) FROM documentos WHERE fuente='scraper'")
-    ultima = c.fetchone()[0]
-    c.execute("SELECT COUNT(*) FROM scraper_log WHERE estado='ok' AND date(fecha)=date('now')")
-    hoy = c.fetchone()[0]
-    conn.close()
-    return jsonify({'total':total,'por_tipo':por_tipo,'por_anio':por_anio,
-                    'ultima_actualizacion':ultima,'nuevos_hoy':hoy})
+    conn = get_db()
+    try:
+        c = conn.cursor()
+        c.execute('SELECT COUNT(*) FROM documentos')
+        total = c.fetchone()[0]
+        c.execute('SELECT tipo, COUNT(*) cnt FROM documentos GROUP BY tipo')
+        por_tipo = {row[0]: row[1] for row in c.fetchall()}
+        c.execute('SELECT anio, COUNT(*) cnt FROM documentos GROUP BY anio ORDER BY anio DESC LIMIT 10')
+        por_anio = {row[0]: row[1] for row in c.fetchall()}
+        c.execute('SELECT MAX(fecha_carga) FROM documentos')
+        ultima = c.fetchone()[0]
+        c.execute("SELECT COUNT(*) FROM scraper_log WHERE estado='ok' AND date(fecha)=date('now')")
+        hoy = c.fetchone()[0]
+    finally:
+        conn.close()
 
-# ── Panel Scraper ─────────────────────────────────────────────────────────
+    return jsonify({
+        'total': total,
+        'por_tipo': por_tipo,
+        'por_anio': por_anio,
+        'ultima_actualizacion': ultima,
+        'nuevos_hoy': hoy,
+    })
+
+
+@app.route('/app/asistente')
+def app_asistente():
+    context = get_catalog_context()
+    return render_app(
+        'asistente.html',
+        active_section='asistente',
+        page_title='Asistente tributario',
+        page_subtitle='Interfaz inicial para RAG con evidencia. Responde solo sobre el corpus disponible y siempre deja fuentes trazables.',
+        **context,
+    )
+
+
+@app.route('/api/chat', methods=['POST'])
+def chat_tributario():
+    data = request.get_json(silent=True) or {}
+    pregunta = (data.get('pregunta') or '').strip()
+    filtros = data.get('filtros') or {}
+    if not pregunta:
+        return jsonify({'error': 'Debes enviar una pregunta.'}), 400
+    try:
+        respuesta = responder_consulta_tributaria(DB, pregunta, filtros=filtros)
+        return jsonify(respuesta)
+    except Exception as exc:
+        log.exception('Error en /api/chat')
+        return jsonify({'error': f'No fue posible responder la consulta: {exc}'}), 500
+
+
+@app.route('/api/casos')
+def api_casos():
+    return jsonify({'casos': get_case_options()})
+
+
+@app.route('/app/casos', methods=['GET', 'POST'])
+def app_casos():
+    if request.method == 'POST':
+        nombre = (request.form.get('nombre') or '').strip()
+        rut_cliente = (request.form.get('rut_cliente') or '').strip() or None
+        descripcion = (request.form.get('descripcion') or '').strip() or None
+        estado = (request.form.get('estado') or 'activo').strip() or 'activo'
+        if nombre:
+            conn = get_db()
+            try:
+                cursor = conn.execute(
+                    """
+                    INSERT INTO casos(nombre, rut_cliente, descripcion, estado, fecha_creacion, fecha_modificacion)
+                    VALUES(?, ?, ?, ?, datetime('now'), datetime('now'))
+                    """,
+                    (nombre, rut_cliente, descripcion, estado),
+                )
+                conn.commit()
+                case_id = cursor.lastrowid
+            finally:
+                conn.close()
+            return redirect(url_for('app_casos', caso=case_id))
+
+    catalog_context = get_catalog_context()
+    casos = get_case_overview()
+    selected_case_id = request.args.get('caso', type=int)
+    if not selected_case_id and casos:
+        selected_case_id = casos[0]['id']
+    caso_activo, notas_caso = get_case_detail(selected_case_id) if selected_case_id else (None, [])
+    prefill_doc = get_doc_preview(request.args.get('doc_id', type=int))
+    return render_app(
+        'casos.html',
+        active_section='casos',
+        page_title='Casos y vaults privados',
+        page_subtitle='CRUD minimo de carpetas por cliente o asunto para guardar notas, consultas IA y documentos relevantes.',
+        total=catalog_context['total'],
+        casos=casos,
+        caso_activo=caso_activo,
+        notas_caso=notas_caso,
+        prefill_doc=prefill_doc,
+    )
+
+
+@app.route('/app/casos/<int:caso_id>/notas', methods=['POST'])
+def agregar_nota_caso(caso_id):
+    contenido = (request.form.get('contenido') or '').strip() or None
+    tipo = (request.form.get('tipo') or 'nota').strip()
+    doc_id = request.form.get('doc_id', type=int)
+    conn = get_db()
+    try:
+        caso = conn.execute('SELECT id FROM casos WHERE id = ?', (caso_id,)).fetchone()
+        if not caso:
+            return 'Caso no encontrado', 404
+        conn.execute("UPDATE casos SET fecha_modificacion=datetime('now') WHERE id=?", (caso_id,))
+        conn.execute(
+            "INSERT INTO caso_notas(caso_id, contenido, tipo, doc_id, fecha) VALUES(?, ?, ?, ?, datetime('now'))",
+            (caso_id, contenido, tipo, doc_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    return redirect(url_for('app_casos', caso=caso_id))
+
+@app.route('/api/casos/<int:caso_id>/guardar-documento', methods=['POST'])
+def guardar_documento_en_caso(caso_id):
+    data = request.get_json(silent=True) or {}
+    doc_id = data.get('doc_id')
+    comentario = (data.get('comentario') or '').strip() or None
+    if not doc_id:
+        return jsonify({'ok': False, 'error': 'Debes indicar el documento.'}), 400
+
+    conn = get_db()
+    try:
+        caso = conn.execute('SELECT id FROM casos WHERE id = ?', (caso_id,)).fetchone()
+        doc = conn.execute('SELECT referencia, titulo FROM documentos WHERE id = ?', (doc_id,)).fetchone()
+        if not caso:
+            return jsonify({'ok': False, 'error': 'Caso no encontrado.'}), 404
+        if not doc:
+            return jsonify({'ok': False, 'error': 'Documento no encontrado.'}), 404
+
+        contenido = comentario or f"Documento vinculado: {doc['referencia'] or doc['titulo']}"
+        conn.execute("UPDATE casos SET fecha_modificacion=datetime('now') WHERE id=?", (caso_id,))
+        conn.execute(
+            """
+            INSERT INTO caso_notas(caso_id, contenido, tipo, doc_id, fecha)
+            VALUES(?, ?, 'documento_adjunto', ?, datetime('now'))
+            """,
+            (caso_id, contenido, doc_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    return jsonify({'ok': True})
+
+
+@app.route('/api/casos/<int:caso_id>/guardar-consulta', methods=['POST'])
+def guardar_consulta_en_caso(caso_id):
+    data = request.get_json(silent=True) or {}
+    pregunta = (data.get('pregunta') or '').strip()
+    respuesta = (data.get('respuesta') or '').strip()
+    fundamento = (data.get('fundamento') or '').strip()
+    riesgos = (data.get('riesgos') or '').strip()
+    confianza = (data.get('confianza') or '').strip()
+    nota = (data.get('nota') or '').strip()
+    fuentes = data.get('fuentes') or []
+
+    if not pregunta and not respuesta:
+        return jsonify({'ok': False, 'error': 'No hay contenido para guardar.'}), 400
+
+    fuentes_texto = '\n'.join(
+        f"- {fuente.get('referencia', 'Documento')} (ID {fuente.get('id')})"
+        for fuente in fuentes
+    ) or '- Sin fuentes asociadas'
+    contenido = (
+        f"Pregunta:\n{pregunta}\n\n"
+        f"Respuesta:\n{respuesta}\n\n"
+        f"Fundamento:\n{fundamento}\n\n"
+        f"Riesgos:\n{riesgos}\n\n"
+        f"Confianza:\n{confianza}\n\n"
+        f"Nota:\n{nota}\n\n"
+        f"Fuentes:\n{fuentes_texto}"
+    )
+
+    conn = get_db()
+    try:
+        caso = conn.execute('SELECT id FROM casos WHERE id = ?', (caso_id,)).fetchone()
+        if not caso:
+            return jsonify({'ok': False, 'error': 'Caso no encontrado.'}), 404
+        conn.execute("UPDATE casos SET fecha_modificacion=datetime('now') WHERE id=?", (caso_id,))
+        conn.execute(
+            """
+            INSERT INTO caso_notas(caso_id, contenido, tipo, doc_id, fecha)
+            VALUES(?, ?, 'consulta_ia', NULL, datetime('now'))
+            """,
+            (caso_id, contenido),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    return jsonify({'ok': True})
+
+
+@app.route('/app/toolkit')
+def app_toolkit():
+    context = get_catalog_context()
+    return render_app(
+        'toolkit.html',
+        active_section='toolkit',
+        page_title='Toolkit tributario',
+        page_subtitle='Primer espacio para calculadoras, calendario y tablas auxiliares sin mezclarlo con el corpus documental.',
+        **context,
+    )
+
+
 @app.route('/scraper')
-def scraper_panel():
-    conn = get_db(); c = conn.cursor()
-    c.execute("SELECT * FROM scraper_log ORDER BY fecha DESC LIMIT 100")
-    logs = [dict(r) for r in c.fetchall()]
-    c.execute("SELECT tipo,anio,COUNT(*) cnt,SUM(CASE WHEN estado='ok' THEN 1 ELSE 0 END) ok FROM scraper_log GROUP BY tipo,anio ORDER BY anio DESC LIMIT 30")
-    resumen = [dict(r) for r in c.fetchall()]
-    c.execute("SELECT value FROM scheduler_config WHERE key='ultima_ejecucion'")
-    row = c.fetchone()
-    ultima_ejecucion = row[0] if row else 'Nunca'
-    conn.close()
-    return render_template('scraper.html', logs=logs, resumen=resumen,
-                           ultima_ejecucion=ultima_ejecucion,
-                           status=scraper_status)
+def scraper_panel_legacy():
+    return redirect(url_for('admin_scraper'))
+
+
+@app.route('/admin/scraper')
+def admin_scraper():
+    context = load_scraper_context()
+    total = get_total_docs()
+    return render_app(
+        'scraper.html',
+        active_section='admin_scraper',
+        page_title='Panel de scraping',
+        page_subtitle='Control operativo del corpus, monitoreo del scheduler y lanzamientos manuales del scraper existente.',
+        total=total,
+        **context,
+    )
+
+
+@app.route('/admin/ingestion')
+def admin_ingestion():
+    context = get_catalog_context()
+    return render_app(
+        'admin_ingestion.html',
+        active_section='admin_ingestion',
+        page_title='Ingestion y QA',
+        page_subtitle='Stub inicial para futuras fuentes, chequeos de completitud y flujos de enriquecimiento documental.',
+        **context,
+    )
+
 
 @app.route('/api/scraper/iniciar', methods=['POST'])
 def iniciar_scraper():
     global scraper_status
     if scraper_status['running']:
-        return jsonify({'ok': False, 'msg': 'Ya hay un scraper en ejecución'})
+        return jsonify({'ok': False, 'msg': 'Ya hay un scraper en ejecucion'})
 
-    data    = request.json or {}
-    tipo    = data.get('tipo', 'circular')
-    anio_d  = int(data.get('anio_desde', date.today().year))
-    anio_h  = int(data.get('anio_hasta', date.today().year))
-    delay   = float(data.get('delay', 1.0))
+    data = request.json or {}
+    tipo = data.get('tipo', 'circular')
+    anio_desde = int(data.get('anio_desde', date.today().year))
+    anio_hasta = int(data.get('anio_hasta', date.today().year))
+    delay = float(data.get('delay', 1.0))
 
     with _lock:
         scraper_status.update({
-            'running': True, 'messages': [], 'total': 0,
-            'procesados': 0, 'nuevos': 0, 'errores': 0,
-            'inicio': datetime.now().isoformat()
+            'running': True,
+            'messages': [],
+            'total': 0,
+            'procesados': 0,
+            'nuevos': 0,
+            'errores': 0,
+            'inicio': datetime.now().isoformat(),
         })
 
     def run():
@@ -526,62 +1036,66 @@ def iniciar_scraper():
             sys.path.insert(0, os.path.join(BASE, 'scraper'))
             from engine import scrape_anio
 
-            for anio in range(anio_h, anio_d - 1, -1):
-                push_msg(f"─── Iniciando {tipo.upper()} {anio} ───", True)
+            for anio in range(anio_hasta, anio_desde - 1, -1):
+                push_msg(f'--- Iniciando {tipo.upper()} {anio} ---', True)
                 result = scrape_anio(tipo, anio, callback=push_msg, delay=delay)
-                push_msg(f"Año {anio} completado — {result.get('nuevos',0)} nuevos, {result.get('errores',0)} errores", True)
-
-        except Exception as e:
-            push_msg(f"ERROR CRÍTICO: {e}", False)
+                push_msg(f'Anio {anio} completado - {result.get("nuevos", 0)} nuevos, {result.get("errores", 0)} errores', True)
+        except Exception as exc:
+            push_msg(f'ERROR CRITICO: {exc}', False)
         finally:
             with _lock:
                 scraper_status['running'] = False
-            push_msg("SCRAPER_DONE", True)
+            push_msg('SCRAPER_DONE', True)
 
-    t = threading.Thread(target=run, daemon=True)
-    t.start()
+    threading.Thread(target=run, daemon=True).start()
     return jsonify({'ok': True, 'msg': 'Scraper iniciado'})
+
 
 @app.route('/api/scraper/historico', methods=['POST'])
 def iniciar_historico():
     global scraper_status
     if scraper_status['running']:
-        return jsonify({'ok': False, 'msg': 'Ya hay un scraper en ejecución'})
+        return jsonify({'ok': False, 'msg': 'Ya hay un scraper en ejecucion'})
 
-    data   = request.json or {}
-    tipos  = data.get('tipos', ['circular'])
-    desde  = int(data.get('desde', 2015))
-    hasta  = int(data.get('hasta', date.today().year))
-    delay  = float(data.get('delay', 1.5))
+    data = request.json or {}
+    tipos = data.get('tipos', ['circular'])
+    desde = int(data.get('desde', 2015))
+    hasta = int(data.get('hasta', date.today().year))
+    delay = float(data.get('delay', 1.5))
 
     with _lock:
         scraper_status.update({
-            'running': True, 'messages': [], 'total': 0,
-            'procesados': 0, 'nuevos': 0, 'errores': 0,
-            'inicio': datetime.now().isoformat()
+            'running': True,
+            'messages': [],
+            'total': 0,
+            'procesados': 0,
+            'nuevos': 0,
+            'errores': 0,
+            'inicio': datetime.now().isoformat(),
         })
 
     def run():
         try:
             import sys
+            import time
             sys.path.insert(0, os.path.join(BASE, 'scraper'))
             from engine import scrape_anio
 
             for anio in range(hasta, desde - 1, -1):
                 for tipo in tipos:
-                    push_msg(f"─── {tipo.upper()} {anio} ───", True)
+                    push_msg(f'--- {tipo.upper()} {anio} ---', True)
                     try:
                         result = scrape_anio(tipo, anio, callback=push_msg, delay=delay)
-                        push_msg(f"✔ {tipo} {anio}: {result.get('nuevos',0)} nuevos", True)
-                    except Exception as e:
-                        push_msg(f"⚠ Error {tipo} {anio}: {e}", False)
-                    import time; time.sleep(2)
-        except Exception as e:
-            push_msg(f"ERROR: {e}", False)
+                        push_msg(f'OK {tipo} {anio}: {result.get("nuevos", 0)} nuevos', True)
+                    except Exception as exc:
+                        push_msg(f'WARN {tipo} {anio}: {exc}', False)
+                    time.sleep(2)
+        except Exception as exc:
+            push_msg(f'ERROR: {exc}', False)
         finally:
             with _lock:
                 scraper_status['running'] = False
-            push_msg("SCRAPER_DONE", True)
+            push_msg('SCRAPER_DONE', True)
 
     threading.Thread(target=run, daemon=True).start()
     return jsonify({'ok': True})
@@ -590,26 +1104,27 @@ def iniciar_historico():
 def detener_scraper():
     with _lock:
         scraper_status['running'] = False
-    push_msg("⏹ Scraper detenido por el usuario", False)
+    push_msg('Scraper detenido por el usuario', False)
     return jsonify({'ok': True})
+
 
 @app.route('/api/scraper/status')
 def scraper_status_api():
     with _lock:
-        msgs_nuevos = list(scraper_status['messages'])
+        nuevos = list(scraper_status['messages'])
         scraper_status['messages'] = []
-    return jsonify({
-        'running':    scraper_status['running'],
-        'nuevos':     scraper_status['nuevos'],
-        'errores':    scraper_status['errores'],
-        'procesados': scraper_status['procesados'],
-        'total':      scraper_status['total'],
-        'messages':   msgs_nuevos,
-    })
+        return jsonify({
+            'running': scraper_status['running'],
+            'nuevos': scraper_status['nuevos'],
+            'errores': scraper_status['errores'],
+            'procesados': scraper_status['procesados'],
+            'total': scraper_status['total'],
+            'messages': nuevos,
+        })
+
 
 @app.route('/api/scraper/novedades', methods=['POST'])
 def check_novedades():
-    """Ejecuta verificación diaria manual"""
     if scraper_status['running']:
         return jsonify({'ok': False, 'msg': 'Scraper ocupado'})
 
@@ -622,102 +1137,123 @@ def check_novedades():
             sys.path.insert(0, os.path.join(BASE, 'scraper'))
             from engine import check_novedades as _check
             _check(callback=push_msg)
-        except Exception as e:
-            push_msg(f"Error: {e}", False)
+        except Exception as exc:
+            push_msg(f'Error: {exc}', False)
         finally:
             with _lock:
                 scraper_status['running'] = False
-            push_msg("SCRAPER_DONE", True)
+            push_msg('SCRAPER_DONE', True)
 
     threading.Thread(target=run, daemon=True).start()
     return jsonify({'ok': True})
 
-# ── Formulario agregar manual ─────────────────────────────────────────────
+
 @app.route('/agregar', methods=['GET', 'POST'])
 def agregar():
     if request.method == 'POST':
-        d = request.json
-        import sys; sys.path.insert(0, os.path.join(BASE,'scraper'))
+        data = request.json or {}
+        import sys
+        sys.path.insert(0, os.path.join(BASE, 'scraper'))
         try:
             from engine import detectar_leyes, detectar_articulos
-            texto = f"{d.get('titulo','')} {d.get('contenido','')}"
-            if not d.get('leyes_citadas'):
-                d['leyes_citadas'] = json.dumps(detectar_leyes(texto))
-            if not d.get('articulos_clave'):
-                d['articulos_clave'] = json.dumps(detectar_articulos(texto)[:20])
-        except: pass
+            texto = f"{data.get('titulo', '')} {data.get('contenido', '')}"
+            if not data.get('leyes_citadas'):
+                data['leyes_citadas'] = json.dumps(detectar_leyes(texto))
+            if not data.get('articulos_clave'):
+                data['articulos_clave'] = json.dumps(detectar_articulos(texto)[:20])
+        except Exception:
+            pass
 
-        d['hash_md5'] = hashlib.md5(
-            (d.get('titulo','') + str(d.get('anio',''))).encode()
-        ).hexdigest()
-        if not d.get('referencia'):
-            d['referencia'] = f"{tipo_formal(d['tipo'])} N°{d.get('numero','')} de {d.get('anio','')}"
+        data['hash_md5'] = hashlib.md5((data.get('titulo', '') + str(data.get('anio', ''))).encode()).hexdigest()
+        if not data.get('referencia'):
+            data['referencia'] = f"{tipo_formal(data['tipo'])} N{data.get('numero', '')} de {data.get('anio', '')}"
 
-        conn = get_db(); c = conn.cursor()
+        conn = get_db()
         try:
-            c.execute("""INSERT OR IGNORE INTO documentos
-                (hash_md5,tipo,numero,anio,fecha,titulo,materia,subtema,contenido,
-                 resumen,url_sii,referencia,palabras_clave,leyes_citadas,articulos_clave)
-                VALUES(:hash_md5,:tipo,:numero,:anio,:fecha,:titulo,:materia,:subtema,
-                       :contenido,:resumen,:url_sii,:referencia,:palabras_clave,
-                       :leyes_citadas,:articulos_clave)""", d)
-            doc_id = c.lastrowid; conn.commit()
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT OR IGNORE INTO documentos
+                (hash_md5, tipo, numero, anio, fecha, titulo, materia, subtema, contenido,
+                 resumen, url_sii, referencia, palabras_clave, leyes_citadas, articulos_clave)
+                VALUES(:hash_md5, :tipo, :numero, :anio, :fecha, :titulo, :materia, :subtema,
+                       :contenido, :resumen, :url_sii, :referencia, :palabras_clave,
+                       :leyes_citadas, :articulos_clave)
+                """,
+                data,
+            )
+            doc_id = cursor.lastrowid
+            conn.commit()
             return jsonify({'ok': True, 'id': doc_id})
-        except Exception as e:
-            return jsonify({'ok': False, 'error': str(e)})
-        finally: conn.close()
-    return render_template('agregar.html', materias=MATERIAS, leyes=LEYES)
+        except Exception as exc:
+            return jsonify({'ok': False, 'error': str(exc)})
+        finally:
+            conn.close()
 
-# ── Scheduler diario ──────────────────────────────────────────────────────
+    context = get_catalog_context()
+    return render_app(
+        'agregar.html',
+        active_section='agregar',
+        page_title='Agregar documento manual',
+        page_subtitle='Carga puntual para documentos fuera del flujo automatico o para apoyo editorial del corpus.',
+        **context,
+    )
+
+
 def iniciar_scheduler():
-    """Verifica novedades todos los días a las 08:00"""
     try:
-        import schedule, time
+        import schedule
+        import time
 
         def job():
             if scraper_status['running']:
-                log.info("Scheduler: scraper ocupado, saltando")
+                log.info('Scheduler: scraper ocupado, se omite esta corrida')
                 return
-            log.info("⏰ Scheduler: verificando novedades diarias")
+            log.info('Scheduler: verificando novedades diarias')
             with _lock:
                 scraper_status.update({'running': True, 'nuevos': 0, 'errores': 0})
             try:
                 import sys
-                sys.path.insert(0, os.path.join(BASE,'scraper'))
+                sys.path.insert(0, os.path.join(BASE, 'scraper'))
                 from engine import check_novedades
                 nuevos = check_novedades(callback=push_msg)
-                log.info(f"✅ Scheduler completado — {nuevos} documentos nuevos")
-                # Guardar timestamp
+                log.info('Scheduler completado - %s documentos nuevos', nuevos)
                 conn = get_db()
-                conn.execute("INSERT OR REPLACE INTO scheduler_config(key,value) VALUES('ultima_ejecucion',?)",
-                             (datetime.now().isoformat(),))
-                conn.commit(); conn.close()
-            except Exception as e:
-                log.error(f"Scheduler error: {e}")
+                conn.execute(
+                    "INSERT OR REPLACE INTO scheduler_config(key, value) VALUES('ultima_ejecucion', ?)",
+                    (datetime.now().isoformat(),),
+                )
+                conn.commit()
+                conn.close()
+            except Exception as exc:
+                log.error('Scheduler error: %s', exc)
             finally:
-                with _lock: scraper_status['running'] = False
+                with _lock:
+                    scraper_status['running'] = False
 
-        schedule.every().day.at("08:00").do(job)
+        schedule.every().day.at('08:00').do(job)
 
         def loop():
             while True:
                 schedule.run_pending()
                 time.sleep(60)
 
-        t = threading.Thread(target=loop, daemon=True)
-        t.start()
-        log.info("✅ Scheduler diario activo — 08:00 AM")
-        return t
+        thread = threading.Thread(target=loop, daemon=True)
+        thread.start()
+        log.info('Scheduler diario activo - 08:00 AM')
+        return thread
     except ImportError:
-        log.warning("'schedule' no instalado — scheduler no activo")
+        log.warning("'schedule' no instalado - scheduler no activo")
         return None
+
 
 if __name__ == '__main__':
     init_db()
     scheduler_thread = iniciar_scheduler()
-    log.info("\n" + "="*60)
-    log.info("  SII Normativa V2.0")
-    log.info("  http://localhost:5000")
-    log.info("  Scheduler diario: 08:00 AM")
-    log.info("="*60 + "\n")
+    log.info('\n' + '=' * 60)
+    log.info('  TaxLab IA - Fase A')
+    log.info('  http://localhost:5000')
+    log.info('  Scheduler diario: 08:00 AM')
+    log.info('=' * 60 + '\n')
     app.run(debug=False, port=5000, use_reloader=False)
+

@@ -1,0 +1,187 @@
+﻿{% extends 'base.html' %}
+
+{% block title %}Casos | TaxLab IA{% endblock %}
+
+{% block top_actions %}
+<a class="btn btn-secondary" href="/app/asistente">Ir al asistente</a>
+<a class="btn btn-primary" href="#crear-caso">Nuevo caso</a>
+{% endblock %}
+
+{% block page_styles %}
+<style>
+.casos-shell{display:grid;grid-template-columns:320px minmax(0,1fr);gap:18px;align-items:start}
+.case-list{display:grid;gap:10px}
+.case-item{
+  display:block;
+  padding:14px;
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:var(--panel-2);
+  text-decoration:none;
+  transition:.16s ease;
+}
+.case-item:hover{border-color:rgba(215,163,43,.28)}
+.case-item.active{border-color:rgba(215,163,43,.42);background:var(--accent-soft)}
+.case-name{font-size:15px;font-weight:700;color:var(--text)}
+.case-meta{margin-top:6px;font-size:12px;color:var(--muted);line-height:1.6}
+.note-list{display:grid;gap:10px}
+.note-item{
+  padding:14px;
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:var(--panel-2);
+}
+.note-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:8px}
+.note-type{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--accent)}
+.note-copy{font-size:14px;line-height:1.75;color:var(--text-soft);white-space:pre-wrap}
+.note-link{display:inline-flex;margin-top:10px;font-size:12px;color:var(--accent);text-decoration:none}
+.prefill-box{margin-bottom:14px;padding:14px;border:1px dashed rgba(215,163,43,.35);border-radius:14px;background:rgba(215,163,43,.05)}
+@media (max-width: 980px){.casos-shell{grid-template-columns:1fr}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="casos-shell">
+  <div style="display:grid;gap:18px;">
+    <section class="card" id="crear-caso">
+      <div class="card-head"><div class="card-title">Crear caso</div></div>
+      <div class="card-body">
+        <form method="post" action="/app/casos" style="display:grid;gap:14px;">
+          <div class="field">
+            <label class="label">Nombre del caso</label>
+            <input class="input" type="text" name="nombre" placeholder="Ejemplo: Reclamacion art. 124 CT - Cliente XYZ" required>
+          </div>
+          <div class="field-grid">
+            <div class="field">
+              <label class="label">RUT cliente</label>
+              <input class="input" type="text" name="rut_cliente" placeholder="76.123.456-7">
+            </div>
+            <div class="field">
+              <label class="label">Estado</label>
+              <select class="select" name="estado">
+                <option value="activo">Activo</option>
+                <option value="en_revision">En revision</option>
+                <option value="cerrado">Cerrado</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label class="label">Descripcion</label>
+            <textarea class="textarea" name="descripcion" placeholder="Contexto del cliente, contingencia, impuesto involucrado, plazo o tribunal."></textarea>
+          </div>
+          <button class="btn btn-primary" type="submit">Crear caso</button>
+        </form>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><div class="card-title">Casos existentes</div></div>
+      <div class="card-body tight">
+        {% if casos %}
+        <div class="case-list">
+          {% for caso in casos %}
+          <a href="/app/casos?caso={{ caso.id }}{% if prefill_doc %}&doc_id={{ prefill_doc.id }}{% endif %}" class="case-item {% if caso_activo and caso_activo.id == caso.id %}active{% endif %}">
+            <div class="case-name">{{ caso.nombre }}</div>
+            <div class="case-meta">{{ caso.rut_cliente or 'Sin RUT' }} · {{ caso.estado }}<br>{{ caso.total_notas }} notas · {{ caso.total_docs }} docs vinculados</div>
+          </a>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="flash-inline">Todavia no existen casos privados. Crea el primero para empezar a guardar notas, consultas IA y documentos.</div>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+
+  <div style="display:grid;gap:18px;">
+    <section class="card">
+      <div class="card-head"><div class="card-title">Caso activo</div></div>
+      <div class="card-body">
+        {% if caso_activo %}
+          <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+            <span class="badge info">{{ caso_activo.estado }}</span>
+            {% if caso_activo.rut_cliente %}<span class="badge">{{ caso_activo.rut_cliente }}</span>{% endif %}
+          </div>
+          <div style="font-family:'Crimson Pro',serif;font-size:30px;font-weight:700;line-height:1.1;">{{ caso_activo.nombre }}</div>
+          <div style="margin-top:10px;color:var(--text-soft);font-size:14px;line-height:1.75;">{{ caso_activo.descripcion or 'Sin descripcion registrada.' }}</div>
+          <div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:14px;color:var(--muted);font-size:12px;">
+            <span>Creado: {{ caso_activo.fecha_creacion }}</span>
+            <span>Actualizado: {{ caso_activo.fecha_modificacion }}</span>
+          </div>
+
+          {% if prefill_doc %}
+          <div class="prefill-box">
+            <div class="label" style="margin-bottom:8px;">Documento pendiente por guardar</div>
+            <div style="font-size:14px;font-weight:700;">{{ prefill_doc.referencia or prefill_doc.titulo }}</div>
+            <div style="margin-top:6px;color:var(--text-soft);font-size:13px;line-height:1.7;">{{ prefill_doc.titulo }}</div>
+            <form method="post" action="/app/casos/{{ caso_activo.id }}/notas" style="margin-top:12px;display:grid;gap:10px;">
+              <input type="hidden" name="tipo" value="documento_adjunto">
+              <input type="hidden" name="doc_id" value="{{ prefill_doc.id }}">
+              <textarea class="textarea" name="contenido" placeholder="Comentario opcional para este documento en el caso."></textarea>
+              <button class="btn btn-secondary" type="submit">Vincular documento al caso</button>
+            </form>
+          </div>
+          {% endif %}
+
+          <div class="card" style="margin-top:16px;box-shadow:none;">
+            <div class="card-head"><div class="card-title">Agregar nota</div></div>
+            <div class="card-body">
+              <form method="post" action="/app/casos/{{ caso_activo.id }}/notas" style="display:grid;gap:14px;">
+                <div class="field-grid">
+                  <div class="field">
+                    <label class="label">Tipo</label>
+                    <select class="select" name="tipo">
+                      <option value="nota">Nota</option>
+                      <option value="consulta_ia">Consulta IA</option>
+                      <option value="documento_adjunto">Documento asociado</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label class="label">Documento relacionado (opcional)</label>
+                    <input class="input" type="number" name="doc_id" placeholder="ID documento">
+                  </div>
+                </div>
+                <div class="field">
+                  <label class="label">Contenido</label>
+                  <textarea class="textarea" name="contenido" placeholder="Notas del caso, estrategia, hallazgos o extractos relevantes."></textarea>
+                </div>
+                <button class="btn btn-primary" type="submit">Guardar nota</button>
+              </form>
+            </div>
+          </div>
+        {% else %}
+          <div class="empty-state">
+            <div style="font-size:30px;">Vault</div>
+            <div class="empty-title">Selecciona o crea un caso</div>
+            <div class="empty-copy">Esta vista queda preparada para guardar notas, consultas IA y documentos relevantes por cliente o asunto. El MVP usa SQLite y formularios simples para no romper el producto actual.</div>
+          </div>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><div class="card-title">Notas y actividad</div></div>
+      <div class="card-body tight">
+        {% if notas_caso %}
+          <div class="note-list">
+            {% for nota in notas_caso %}
+            <div class="note-item">
+              <div class="note-top">
+                <div class="note-type">{{ nota.tipo }}</div>
+                <div class="muted" style="font-size:12px;">{{ nota.fecha }}</div>
+              </div>
+              <div class="note-copy">{{ nota.contenido or 'Sin contenido.' }}</div>
+              {% if nota.doc_id %}
+              <a class="note-link" href="/app/documento/{{ nota.doc_id }}">Abrir documento {{ nota.doc_id }}{% if nota.doc_titulo %}: {{ nota.doc_titulo }}{% endif %}</a>
+              {% endif %}
+            </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="flash-inline">Cuando el caso tenga notas, consultas guardadas o documentos vinculados apareceran aqui.</div>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock %}

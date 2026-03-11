@@ -1,264 +1,266 @@
-﻿<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>{{ doc.referencia }} · SII Normativa</title>
-<link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;0,700;1,400&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<style>
-:root{--bg:#0e0e0e;--s:#161616;--s2:#1e1e1e;--s3:#262626;--ink:#f0ece4;--ink2:#b8b0a4;--muted:#6b6460;--rule:#2a2a2a;--gold:#c8991e;--gold-lt:#e8b83a;--circ:#3a7abf;--ofic:#bf7a3a;--reso:#3abf6a;--jud:#7a9fbf;--red:#bf3a3a;--green:#3abf6a}
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink)}
-header{background:var(--s);border-bottom:1px solid var(--rule);display:flex;align-items:center;justify-content:space-between;padding:0 1.5rem;height:52px}
-.logo{display:flex;align-items:center;gap:10px;text-decoration:none}
-.logo-badge{font-family:'DM Mono',monospace;font-size:10px;padding:3px 8px;border:1px solid var(--gold);border-radius:3px;color:var(--gold);letter-spacing:1px}
-.logo-name{font-family:'Crimson Pro',serif;font-size:18px;font-weight:600;color:var(--ink)}
-.back{padding:5px 12px;border:1px solid var(--rule);border-radius:3px;color:var(--ink2);text-decoration:none;font-size:12px;transition:all .15s}
-.back:hover{border-color:var(--gold);color:var(--gold)}
-.wrap{display:grid;grid-template-columns:minmax(0,1fr) 320px;max-width:1240px;margin:0 auto;padding:32px 1.5rem 80px;gap:24px}
-.section{background:var(--s);border:1px solid var(--rule);border-radius:5px;overflow:hidden;margin-bottom:14px}
-.sh{background:var(--s2);border-bottom:1px solid var(--rule);padding:10px 16px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--gold);text-transform:uppercase}
-.sb{padding:18px}
-h1{font-family:'Crimson Pro',serif;font-size:clamp(20px,3vw,28px);font-weight:700;line-height:1.25;margin-bottom:16px}
-.badge{padding:2px 7px;border-radius:2px;font-family:'DM Mono',monospace;font-size:9px;font-weight:500;letter-spacing:.5px;text-transform:uppercase;border:1px solid}
-.bc{color:var(--circ);border-color:rgba(58,122,191,.3);background:rgba(58,122,191,.08)}
-.bo{color:var(--ofic);border-color:rgba(191,122,58,.3);background:rgba(191,122,58,.08)}
-.br{color:var(--reso);border-color:rgba(58,191,106,.3);background:rgba(58,191,106,.08)}
-.bj{color:var(--jud);border-color:rgba(122,159,191,.35);background:rgba(122,159,191,.08)}
-.bl{padding:2px 6px;border-radius:2px;font-family:'DM Mono',monospace;font-size:9px;background:var(--s3);color:var(--muted)}
-.bl.lir{color:var(--circ);background:rgba(58,122,191,.12)}
-.bl.livs{color:var(--ofic);background:rgba(191,122,58,.12)}
-.bl.ct{color:var(--red);background:rgba(191,58,58,.12)}
-.bd{background:var(--red);color:#fff;font-size:8px;padding:2px 6px;border-radius:2px;font-family:'DM Mono',monospace;letter-spacing:.5px}
-.tipo-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px}
-.meta-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
-.meta-grid.judicial{grid-template-columns:repeat(4,1fr)}
-.mc{background:var(--s2);border:1px solid var(--rule);border-radius:3px;padding:12px}
-.ml{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:2px;color:var(--gold);text-transform:uppercase;margin-bottom:5px}
-.mv{font-size:13px;font-weight:500;color:var(--ink);line-height:1.45}
-.resumen{font-family:'Crimson Pro',serif;font-size:15px;line-height:1.78;color:var(--ink2);border-left:2px solid var(--gold);padding-left:14px;font-style:italic}
-.content{font-size:13px;line-height:1.85;color:var(--ink);white-space:pre-wrap}
-.kw-wrap{display:flex;flex-wrap:wrap;gap:5px}
-.kw{padding:2px 8px;background:var(--s2);border:1px solid var(--rule);border-radius:2px;font-size:10px;color:var(--ink2);font-family:'DM Mono',monospace}
-.art-tag{padding:2px 8px;background:rgba(200,153,30,.1);border:1px solid rgba(200,153,30,.2);border-radius:2px;font-size:10px;color:var(--gold);font-family:'DM Mono',monospace;cursor:pointer;transition:all .15s}
-.art-tag:hover{background:rgba(200,153,30,.2)}
-.cita-block{background:var(--s2);border:1px solid var(--rule);border-radius:3px;padding:12px;margin-bottom:10px}
-.cl{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:2px;color:var(--gold);text-transform:uppercase;margin-bottom:7px}
-.ct{font-family:'Crimson Pro',serif;font-size:12px;line-height:1.7;color:var(--ink);user-select:all}
-.btn{padding:7px 13px;border-radius:3px;font-size:11px;font-weight:500;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:5px;transition:all .15s;font-family:'DM Sans',sans-serif;text-decoration:none}
-.btn-gold{background:var(--gold);color:#000}.btn-gold:hover{background:var(--gold-lt)}
-.btn-s{background:var(--s2);border:1px solid var(--rule);color:var(--ink2)}.btn-s:hover{border-color:var(--gold);color:var(--gold)}
-.btn-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
-.rel-card{display:block;padding:10px;background:var(--s2);border:1px solid var(--rule);border-radius:3px;margin-bottom:7px;text-decoration:none;transition:all .15s}
-.rel-card:hover{border-color:var(--gold)}
-.rel-ref{font-family:'DM Mono',monospace;font-size:9px;color:var(--gold);margin-bottom:3px}
-.rel-title{font-size:11px;line-height:1.4;color:var(--ink2)}
-.tl-item{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--rule)}
-.tl-item:last-child{border:none}
-.tl-anio{font-family:'DM Mono',monospace;font-size:11px;font-weight:500;color:var(--gold);min-width:40px}
-.tl-ref{font-size:11px;color:var(--ink2)}
-.tl-ref a{color:var(--ink2);text-decoration:none}
-.tl-ref a:hover{color:var(--gold)}
-.tl-vigente{font-family:'DM Mono',monospace;font-size:8px;color:var(--muted)}
-.jnorm{display:grid;grid-template-columns:240px 1fr;gap:10px;padding:10px 0;border-bottom:1px solid var(--rule)}
-.jnorm:last-child{border:none}
-.jnorm-name{font-size:12px;font-weight:600;color:var(--ink2)}
-.jnorm-arts{display:flex;flex-wrap:wrap;gap:5px}
-.jpill{padding:2px 7px;background:var(--s2);border:1px solid var(--rule);border-radius:2px;font-family:'DM Mono',monospace;font-size:10px;color:var(--ink2)}
-.toast{position:fixed;bottom:20px;right:20px;background:var(--green);color:#000;padding:8px 14px;border-radius:3px;font-size:11px;font-weight:600;transform:translateY(40px);opacity:0;transition:all .25s;z-index:400}
-.toast.show{transform:translateY(0);opacity:1}
-@media(max-width:980px){.wrap{grid-template-columns:1fr}.meta-grid,.meta-grid.judicial{grid-template-columns:repeat(2,1fr)}.jnorm{grid-template-columns:1fr}}
-@media(max-width:640px){.meta-grid,.meta-grid.judicial{grid-template-columns:1fr}}
-</style>
-</head>
-<body>
-<header>
-  <a href="/" class="logo"><span class="logo-badge">SII</span><span class="logo-name">Normativa</span></a>
-  <a href="/" class="back">← Volver a busqueda</a>
-</header>
+﻿{% extends 'base.html' %}
 
-<div class="wrap">
+{% block title %}{{ doc.referencia }} | TaxLab IA{% endblock %}
+
+{% block top_actions %}
+<a class="btn btn-secondary" href="/app/buscar">Volver a busqueda</a>
+{% if doc.pdf_url %}<a class="btn btn-primary" href="{{ doc.pdf_url }}" target="_blank">PDF local</a>{% endif %}
+{% endblock %}
+
+{% block page_styles %}
+<style>
+.doc-shell{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:18px;align-items:start}
+.doc-section + .doc-section{margin-top:18px}
+.doc-title{font-family:'Crimson Pro',serif;font-size:38px;font-weight:700;line-height:1.08}
+.doc-sub{margin-top:10px;color:var(--text-soft);font-size:15px;line-height:1.8}
+.meta-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:16px}
+.meta-grid.judicial{grid-template-columns:repeat(4,minmax(0,1fr))}
+.meta-box{padding:14px;border:1px solid var(--line);border-radius:14px;background:var(--panel-2)}
+.meta-label{margin-bottom:6px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:var(--accent)}
+.meta-value{font-size:13px;line-height:1.6;color:var(--text)}
+.rich-copy{font-size:15px;line-height:1.9;color:var(--text-soft);white-space:pre-wrap}
+.keywords{display:flex;flex-wrap:wrap;gap:8px}
+.keyword{padding:6px 10px;border-radius:999px;border:1px solid var(--line);background:var(--panel-2);font-family:'DM Mono',monospace;font-size:11px;color:var(--text-soft)}
+.rel-grid{display:grid;gap:10px}
+.rel-card{display:block;padding:14px;border:1px solid var(--line);border-radius:14px;background:var(--panel-2);text-decoration:none}
+.rel-card:hover{border-color:rgba(215,163,43,.3)}
+.rel-ref{font-family:'DM Mono',monospace;font-size:10px;color:var(--accent);margin-bottom:4px}
+.rel-title{font-size:14px;color:var(--text-soft);line-height:1.6}
+.timeline-item{display:grid;grid-template-columns:64px minmax(0,1fr);gap:12px;padding:12px 0;border-bottom:1px solid var(--line-soft)}
+.timeline-item:last-child{border-bottom:none}
+.timeline-year{font-family:'DM Mono',monospace;font-size:13px;color:var(--accent)}
+.timeline-copy{font-size:13px;line-height:1.7;color:var(--text-soft)}
+.norma-grid{display:grid;grid-template-columns:240px minmax(0,1fr);gap:14px;padding:12px 0;border-bottom:1px solid var(--line-soft)}
+.norma-grid:last-child{border-bottom:none}
+.norma-name{font-size:14px;font-weight:700;color:var(--text)}
+.norma-arts{display:flex;flex-wrap:wrap;gap:6px}
+.note-pill{padding:5px 9px;border-radius:10px;border:1px solid var(--line);background:var(--panel-2);font-family:'DM Mono',monospace;font-size:10px;color:var(--text-soft)}
+.cita-list{display:grid;gap:10px}
+.cita-box{padding:14px;border:1px solid var(--line);border-radius:14px;background:var(--panel-2)}
+.cita-label{margin-bottom:6px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:var(--accent)}
+.cita-copy{font-size:14px;line-height:1.75;color:var(--text-soft);user-select:all}
+.sidebar-stack{display:grid;gap:18px}
+.text-truncate{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:5;overflow:hidden}
+@media (max-width: 1100px){.doc-shell{grid-template-columns:1fr}.meta-grid,.meta-grid.judicial,.norma-grid{grid-template-columns:1fr}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="doc-shell">
   <div>
-    <div class="section">
-      <div class="sb">
-        <div class="tipo-row">
-          <span class="badge b{{ doc.tipo[0] }}">{{ doc.tipo }}</span>
-          {% for l in doc.leyes_citadas %}<span class="bl {{ l.lower() }}">{{ l }}</span>{% endfor %}
-          {% if not doc.vigente %}<span class="bd">DEROGADA/MODIFICADA</span>{% endif %}
+    <section class="card doc-section">
+      <div class="card-body">
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;align-items:center;">
+          <span class="badge info">{{ doc.tipo }}</span>
+          {% for ley in doc.leyes_citadas %}<span class="badge">{{ ley }}</span>{% endfor %}
+          {% if not doc.vigente %}<span class="badge danger">Derogada o modificada</span>{% endif %}
         </div>
-        <h1>{{ doc.titulo }}</h1>
+        <div class="doc-title">{{ doc.titulo }}</div>
+        <div class="doc-sub">{{ doc.referencia }}</div>
         <div class="meta-grid {% if doc.tipo == 'judicial' %}judicial{% endif %}">
-          <div class="mc"><div class="ml">Referencia</div><div class="mv">{{ doc.referencia }}</div></div>
-          <div class="mc"><div class="ml">Fecha</div><div class="mv">{{ doc.fecha or doc.anio }}</div></div>
-          <div class="mc"><div class="ml">Paginas PDF</div><div class="mv">{{ doc.paginas or '-' }}</div></div>
+          <div class="meta-box"><div class="meta-label">Fecha</div><div class="meta-value">{{ doc.fecha or doc.anio or '-' }}</div></div>
+          <div class="meta-box"><div class="meta-label">Paginas</div><div class="meta-value">{{ doc.paginas or '-' }}</div></div>
+          <div class="meta-box"><div class="meta-label">Chars</div><div class="meta-value">{{ doc.chars_texto or '-' }}</div></div>
           {% if doc.tipo == 'judicial' %}
-          <div class="mc"><div class="ml">Corte</div><div class="mv">{{ doc.corte or '-' }}</div></div>
-          <div class="mc"><div class="ml">Tribunal</div><div class="mv">{{ doc.tribunal or '-' }}</div></div>
-          <div class="mc"><div class="ml">Tipo codigo</div><div class="mv">{{ doc.tipo_codigo or '-' }}</div></div>
-          <div class="mc"><div class="ml">Rol / codigo</div><div class="mv">{{ doc.numero or '-' }}</div></div>
-          <div class="mc"><div class="ml">SII ID</div><div class="mv">{{ doc.sii_id or '-' }}</div></div>
+          <div class="meta-box"><div class="meta-label">Corte</div><div class="meta-value">{{ doc.corte or '-' }}</div></div>
+          <div class="meta-box"><div class="meta-label">Tribunal</div><div class="meta-value">{{ doc.tribunal or '-' }}</div></div>
+          <div class="meta-box"><div class="meta-label">Tipo codigo</div><div class="meta-value">{{ doc.tipo_codigo or '-' }}</div></div>
+          <div class="meta-box"><div class="meta-label">Rol / codigo</div><div class="meta-value">{{ doc.numero or '-' }}</div></div>
+          <div class="meta-box"><div class="meta-label">SII ID</div><div class="meta-value">{{ doc.sii_id or '-' }}</div></div>
+          {% else %}
+          <div class="meta-box"><div class="meta-label">Numero</div><div class="meta-value">{{ doc.numero or '-' }}</div></div>
           {% endif %}
         </div>
-        <div class="btn-row">
-          {% if doc.pdf_url %}<a href="{{ doc.pdf_url }}" class="btn btn-gold" target="_blank">Descargar PDF local</a>{% endif %}
-          {% if doc.url_sii %}<a href="{{ doc.url_sii }}" class="btn btn-s" target="_blank">Abrir fuente SII</a>{% endif %}
+        <div class="inline-actions" style="margin-top:16px;">
+          {% if doc.url_sii %}<a class="btn btn-secondary" href="{{ doc.url_sii }}" target="_blank">Abrir fuente SII</a>{% endif %}
+          {% if doc.pdf_url %}<a class="btn btn-primary" href="{{ doc.pdf_url }}" target="_blank">Descargar PDF local</a>{% endif %}
         </div>
       </div>
-    </div>
+    </section>
 
     {% if doc.resumen %}
-    <div class="section">
-      <div class="sh">Resumen ejecutivo</div>
-      <div class="sb"><div class="resumen">{{ doc.resumen }}</div></div>
-    </div>
+    <section class="card doc-section">
+      <div class="card-head"><div class="card-title">Resumen ejecutivo</div></div>
+      <div class="card-body"><div class="rich-copy">{{ doc.resumen }}</div></div>
+    </section>
     {% endif %}
 
     {% if doc.tipo == 'judicial' and judicial_por_norma %}
-    <div class="section">
-      <div class="sh">Relaciones normativas judiciales</div>
-      <div class="sb">
+    <section class="card doc-section">
+      <div class="card-head"><div class="card-title">Relaciones normativas judiciales</div></div>
+      <div class="card-body tight">
         {% for grupo in judicial_por_norma %}
-        <div class="jnorm">
-          <div class="jnorm-name">{{ grupo.cuerpo_normativo }}</div>
-          <div class="jnorm-arts">
-            {% for art in grupo.articulos %}<span class="jpill">{{ art }}</span>{% endfor %}
+        <div class="norma-grid">
+          <div class="norma-name">{{ grupo.cuerpo_normativo }}</div>
+          <div class="norma-arts">
+            {% for articulo in grupo.articulos %}
+            <span class="note-pill">{{ articulo }}</span>
+            {% endfor %}
           </div>
         </div>
         {% endfor %}
       </div>
-    </div>
-    {% endif %}
-
-    {% if doc.materia or doc.subtema %}
-    <div class="section">
-      <div class="sh">Clasificacion</div>
-      <div class="sb">
-        {% if doc.materia %}<div style="font-size:14px;font-weight:500;margin-bottom:4px">{{ doc.materia }}</div>{% endif %}
-        {% if doc.subtema %}<div style="font-size:12px;color:var(--muted)">{{ doc.subtema }}</div>{% endif %}
-      </div>
-    </div>
+    </section>
     {% endif %}
 
     {% if doc.articulos_clave %}
-    <div class="section">
-      <div class="sh">Articulos referenciados</div>
-      <div class="sb">
-        <div class="kw-wrap">
-          {% for a in doc.articulos_clave %}
-          <span class="art-tag" onclick="location.href='/?q={{ a|urlencode }}'">{{ a }}</span>
+    <section class="card doc-section">
+      <div class="card-head"><div class="card-title">Articulos clave</div></div>
+      <div class="card-body">
+        <div class="keywords">
+          {% for articulo in doc.articulos_clave %}
+          <a class="keyword" href="/app/buscar?articulo={{ articulo|urlencode }}">{{ articulo }}</a>
           {% endfor %}
         </div>
       </div>
-    </div>
-    {% endif %}
-
-    {% if doc.contenido %}
-    <div class="section">
-      <div class="sh">{% if doc.tipo == 'judicial' %}Pronunciamiento completo{% else %}Texto extraido del PDF{% endif %}</div>
-      <div class="sb">
-        {% if doc.tipo == 'judicial' %}
-        <div class="content">{{ doc.contenido }}</div>
-        {% else %}
-        <div class="content">{{ doc.contenido[:8000] }}{% if doc.contenido|length > 8000 %}
-...
-[Texto truncado para visualizacion - {{ doc.chars_texto or 0 | int }} caracteres totales]{% endif %}</div>
-        {% endif %}
-      </div>
-    </div>
+    </section>
     {% endif %}
 
     {% if doc.palabras_clave %}
-    <div class="section">
-      <div class="sh">Palabras clave</div>
-      <div class="sb">
-        <div class="kw-wrap">
-          {% for k in doc.palabras_clave.split('|') if k.strip() %}<span class="kw">{{ k.strip() }}</span>{% endfor %}
+    <section class="card doc-section">
+      <div class="card-head"><div class="card-title">Palabras clave</div></div>
+      <div class="card-body">
+        <div class="keywords">
+          {% for keyword in doc.palabras_clave.split('|') if keyword.strip() %}
+          <span class="keyword">{{ keyword.strip() }}</span>
+          {% endfor %}
         </div>
       </div>
-    </div>
+    </section>
     {% endif %}
 
-    <div class="section">
-      <div class="sh">Generador de citas</div>
-      <div class="sb" id="citas-area">
-        <div style="color:var(--muted);font-size:12px;text-align:center;padding:16px">Cargando...</div>
+    {% if doc.contenido %}
+    <section class="card doc-section">
+      <div class="card-head"><div class="card-title">{% if doc.tipo == 'judicial' %}Pronunciamiento completo{% else %}Texto extraido del documento{% endif %}</div></div>
+      <div class="card-body">
+        {% if doc.tipo == 'judicial' %}
+        <div class="rich-copy">{{ doc.contenido }}</div>
+        {% else %}
+        <div class="rich-copy">{{ doc.contenido[:8000] }}{% if doc.contenido|length > 8000 %}
+
+[Texto truncado para visualizacion - {{ doc.chars_texto or 0 }} caracteres totales]{% endif %}</div>
+        {% endif %}
       </div>
-    </div>
+    </section>
+    {% endif %}
   </div>
 
-  <div>
-    {% if relacionados %}
-    <div class="section">
-      <div class="sh">Normas relacionadas</div>
-      <div class="sb">
-        <div style="font-size:10px;color:var(--muted);margin-bottom:10px">Comparten articulos citados</div>
-        {% for r in relacionados %}
-        <a href="/documento/{{ r.id }}" class="rel-card">
-          <div class="rel-ref">{{ r.referencia }}</div>
-          <div class="rel-title">{{ r.titulo[:70] }}{% if r.titulo|length > 70 %}...{% endif %}</div>
-        </a>
-        {% endfor %}
+  <aside class="sidebar-stack">
+    <section class="card">
+      <div class="card-head"><div class="card-title">Generador de citas</div></div>
+      <div class="card-body tight">
+        <div id="citas-area" class="cita-list">
+          <div class="flash-inline">Cargando formatos de cita...</div>
+        </div>
       </div>
-    </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><div class="card-title">Guardar en caso</div></div>
+      <div class="card-body tight">
+        {% if casos %}
+        <div class="field" style="margin-bottom:12px;">
+          <label class="label">Caso destino</label>
+          <select id="caso-destino" class="select">
+            <option value="">Selecciona un caso</option>
+            {% for caso in casos %}
+            <option value="{{ caso.id }}">{{ caso.nombre }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field" style="margin-bottom:12px;">
+          <label class="label">Comentario</label>
+          <textarea id="caso-comentario" class="textarea" placeholder="Por que este documento importa para el caso."></textarea>
+        </div>
+        <button class="btn btn-primary" onclick="guardarDocumentoCaso()">Guardar documento</button>
+        {% else %}
+        <div class="flash-inline">Todavia no hay casos creados. <a href="/app/casos" style="color:var(--accent);">Crea el primero aqui</a>.</div>
+        {% endif %}
+      </div>
+    </section>
+
+    {% if relacionados %}
+    <section class="card">
+      <div class="card-head"><div class="card-title">Relacionados</div></div>
+      <div class="card-body tight">
+        <div class="rel-grid">
+          {% for rel in relacionados %}
+          <a class="rel-card" href="/app/documento/{{ rel.id }}">
+            <div class="rel-ref">{{ rel.referencia }}</div>
+            <div class="rel-title">{{ rel.titulo }}</div>
+          </a>
+          {% endfor %}
+        </div>
+      </div>
+    </section>
     {% endif %}
 
     {% if historial %}
-    <div class="section">
-      <div class="sh">Historial de esta norma</div>
-      <div class="sb">
-        <div style="font-size:10px;color:var(--muted);margin-bottom:10px">Mismo numero, distintos anios</div>
-        {% for h in historial %}
-        <div class="tl-item">
-          <div class="tl-anio">{{ h.anio }}</div>
-          <div>
-            <div class="tl-ref"><a href="/documento/{{ h.id }}">{{ h.referencia }}</a></div>
-            <div class="tl-vigente">{% if not h.vigente %}DEROGADA{% else %}Vigente{% endif %}</div>
+    <section class="card">
+      <div class="card-head"><div class="card-title">Historial por numero</div></div>
+      <div class="card-body tight">
+        {% for item in historial %}
+        <div class="timeline-item">
+          <div class="timeline-year">{{ item.anio }}</div>
+          <div class="timeline-copy">
+            <a href="/app/documento/{{ item.id }}" style="color:var(--text);text-decoration:none;">{{ item.referencia }}</a>
+            <div class="muted">{% if item.vigente %}Vigente{% else %}No vigente{% endif %}</div>
           </div>
         </div>
         {% endfor %}
       </div>
-    </div>
+    </section>
     {% endif %}
-
-    <div class="section">
-      <div class="sh">Fuente y descarga</div>
-      <div class="sb">
-        <div class="btn-row" style="margin-top:0">
-          {% if doc.pdf_url %}<a href="{{ doc.pdf_url }}" class="btn btn-gold" target="_blank">PDF local</a>{% endif %}
-          {% if doc.url_sii %}<a href="{{ doc.url_sii }}" class="btn btn-s" target="_blank">SII.cl</a>{% endif %}
-        </div>
-      </div>
-    </div>
-  </div>
+  </aside>
 </div>
+{% endblock %}
 
-<div class="toast" id="toast">Copiado</div>
-
+{% block page_scripts %}
 <script>
 async function cargarCitas(){
-  const d = await (await fetch('/api/cita/{{ doc.id }}')).json();
-  document.getElementById('citas-area').innerHTML = `
-    <div class="cita-block"><div class="cl">Cita corta</div><div class="ct" id="c1">${d.cita_corta}</div></div>
-    <div class="cita-block"><div class="cl">Cita media</div><div class="ct" id="c2">${d.cita_media}</div></div>
-    <div class="cita-block"><div class="cl">Cita larga</div><div class="ct" id="c3">${d.cita_larga}</div></div>
-    <div class="cita-block"><div class="cl">Cita para escrito</div><div class="ct" id="c4">${d.cita_escrito || d.cita_larga}</div></div>
-    <div class="btn-row">
-      <button class="btn btn-s" onclick="cp('c1')">Corta</button>
-      <button class="btn btn-s" onclick="cp('c2')">Media</button>
-      <button class="btn btn-s" onclick="cp('c3')">Larga</button>
-      <button class="btn btn-gold" onclick="cp('c4')">Escrito</button>
-    </div>`;
+  const response = await fetch('/api/cita/{{ doc.id }}');
+  const data = await response.json();
+  const area = document.getElementById('citas-area');
+  area.innerHTML = `
+    <div class="cita-box"><div class="cita-label">Cita corta</div><div class="cita-copy" id="c1">${data.cita_corta || ''}</div></div>
+    <div class="cita-box"><div class="cita-label">Cita media</div><div class="cita-copy" id="c2">${data.cita_media || ''}</div></div>
+    <div class="cita-box"><div class="cita-label">Cita larga</div><div class="cita-copy" id="c3">${data.cita_larga || ''}</div></div>
+    <div class="cita-box"><div class="cita-label">Cita para escrito</div><div class="cita-copy" id="c4">${data.cita_escrito || data.cita_larga || ''}</div></div>
+    <div class="inline-actions">
+      <button class="btn btn-secondary" onclick="copiarCita('c1')">Corta</button>
+      <button class="btn btn-secondary" onclick="copiarCita('c2')">Media</button>
+      <button class="btn btn-secondary" onclick="copiarCita('c3')">Larga</button>
+      <button class="btn btn-primary" onclick="copiarCita('c4')">Escrito</button>
+    </div>
+  `;
 }
-cargarCitas();
 
-function cp(id){
-  navigator.clipboard.writeText(document.getElementById(id).textContent.trim()).then(()=>{
-    const t = document.getElementById('toast');
-    t.classList.add('show');
-    setTimeout(()=>t.classList.remove('show'), 2000);
+function copiarCita(id){
+  navigator.clipboard.writeText(document.getElementById(id).textContent.trim()).then(() => {
+    alert('Cita copiada al portapapeles.');
   });
 }
-</script>
-</body>
-</html>
 
+async function guardarDocumentoCaso(){
+  const casoId = document.getElementById('caso-destino')?.value;
+  if(!casoId){
+    alert('Selecciona un caso destino.');
+    return;
+  }
+  const comentario = document.getElementById('caso-comentario')?.value || '';
+  const response = await fetch(`/api/casos/${casoId}/guardar-documento`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({doc_id: {{ doc.id }}, comentario})
+  });
+  const data = await response.json();
+  if(!response.ok || !data.ok){
+    alert(data.error || 'No se pudo guardar el documento en el caso.');
+    return;
+  }
+  alert('Documento guardado en el caso.');
+}
+
+cargarCitas();
+</script>
+{% endblock %}

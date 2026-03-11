@@ -1,0 +1,432 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}TaxLab IA{% endblock %}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@500;600;700&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#090909;
+  --panel:#121212;
+  --panel-2:#171717;
+  --panel-3:#1f1f1f;
+  --line:#2a2a2a;
+  --line-soft:#202020;
+  --text:#f4efe7;
+  --text-soft:#bfb6a8;
+  --muted:#7c746a;
+  --accent:#d7a32b;
+  --accent-soft:rgba(215,163,43,.14);
+  --blue:#5b8fd7;
+  --green:#4dbb7a;
+  --red:#c45151;
+  --yellow:#d7a32b;
+  --shadow:0 20px 50px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  min-height:100vh;
+  background:
+    radial-gradient(circle at top right, rgba(215,163,43,.07), transparent 28%),
+    radial-gradient(circle at bottom left, rgba(91,143,215,.06), transparent 32%),
+    var(--bg);
+  color:var(--text);
+  font-family:'DM Sans',sans-serif;
+}
+a{color:inherit}
+button,input,select,textarea{font:inherit}
+.app-shell{
+  min-height:100vh;
+  display:grid;
+  grid-template-columns:260px minmax(0,1fr);
+}
+.sidebar{
+  position:sticky;
+  top:0;
+  height:100vh;
+  border-right:1px solid var(--line);
+  background:linear-gradient(180deg, rgba(18,18,18,.98), rgba(12,12,12,.98));
+  padding:22px 18px 18px;
+  overflow:auto;
+}
+.brand{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  margin-bottom:22px;
+}
+.brand-kicker{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  font-family:'DM Mono',monospace;
+  font-size:11px;
+  letter-spacing:1.7px;
+  text-transform:uppercase;
+  color:var(--accent);
+}
+.brand-kicker::before{
+  content:'';
+  width:10px;
+  height:10px;
+  border-radius:50%;
+  background:var(--accent);
+  box-shadow:0 0 0 4px rgba(215,163,43,.15);
+}
+.brand-title{
+  font-family:'Crimson Pro',serif;
+  font-size:30px;
+  font-weight:700;
+  line-height:1;
+}
+.brand-copy{
+  color:var(--text-soft);
+  font-size:13px;
+  line-height:1.6;
+}
+.sidebar-group{margin-bottom:18px}
+.sidebar-label{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-bottom:8px;
+  font-family:'DM Mono',monospace;
+  font-size:10px;
+  letter-spacing:1.8px;
+  text-transform:uppercase;
+  color:var(--muted);
+}
+.sidebar-label::after{
+  content:'';
+  flex:1;
+  height:1px;
+  background:var(--line);
+}
+.nav-link{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:11px 12px;
+  margin-bottom:4px;
+  border:1px solid transparent;
+  border-radius:10px;
+  color:var(--text-soft);
+  text-decoration:none;
+  transition:.16s ease;
+}
+.nav-link:hover{
+  background:var(--panel-2);
+  border-color:var(--line);
+  color:var(--text);
+}
+.nav-link.is-active{
+  background:var(--accent-soft);
+  border-color:rgba(215,163,43,.28);
+  color:var(--accent);
+}
+.nav-copy{display:flex;flex-direction:column;gap:2px}
+.nav-title{font-size:14px;font-weight:600}
+.nav-sub{font-size:11px;color:var(--muted)}
+.nav-link.is-active .nav-sub{color:rgba(215,163,43,.72)}
+.sidebar-foot{
+  margin-top:26px;
+  padding:14px;
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:rgba(255,255,255,.015);
+}
+.sidebar-foot dt{
+  margin-bottom:6px;
+  font-family:'DM Mono',monospace;
+  font-size:10px;
+  letter-spacing:1.6px;
+  text-transform:uppercase;
+  color:var(--muted);
+}
+.sidebar-foot dd{
+  margin-bottom:12px;
+  color:var(--text-soft);
+  font-size:12px;
+  line-height:1.6;
+}
+.sidebar-foot dd:last-child{margin-bottom:0}
+.main-shell{min-width:0;display:flex;flex-direction:column}
+.topbar{
+  position:sticky;
+  top:0;
+  z-index:20;
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:20px;
+  padding:20px 28px 18px;
+  border-bottom:1px solid var(--line);
+  backdrop-filter:blur(16px);
+  background:rgba(9,9,9,.78);
+}
+.topbar-title{
+  font-family:'Crimson Pro',serif;
+  font-size:30px;
+  font-weight:700;
+  line-height:1.08;
+}
+.topbar-copy{
+  margin-top:6px;
+  max-width:820px;
+  color:var(--text-soft);
+  font-size:14px;
+  line-height:1.6;
+}
+.topbar-actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end}
+.page-shell{padding:26px 28px 44px}
+.page-shell.compact{padding-top:18px}
+.card{
+  background:linear-gradient(180deg, rgba(20,20,20,.98), rgba(15,15,15,.98));
+  border:1px solid var(--line);
+  border-radius:18px;
+  box-shadow:var(--shadow);
+}
+.card + .card{margin-top:18px}
+.card-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  padding:18px 20px;
+  border-bottom:1px solid var(--line-soft);
+}
+.card-title{
+  font-family:'DM Mono',monospace;
+  font-size:11px;
+  letter-spacing:1.7px;
+  text-transform:uppercase;
+  color:var(--accent);
+}
+.card-body{padding:20px}
+.card-body.tight{padding:16px}
+.kpi-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.kpi{
+  padding:18px;
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:var(--panel-2);
+}
+.kpi-value{
+  font-family:'Crimson Pro',serif;
+  font-size:34px;
+  font-weight:700;
+  color:var(--accent);
+  line-height:1;
+}
+.kpi-label{
+  margin-top:6px;
+  color:var(--text-soft);
+  font-size:12px;
+}
+.kpi-note{
+  margin-top:10px;
+  color:var(--muted);
+  font-size:11px;
+}
+.btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  padding:10px 16px;
+  border-radius:12px;
+  border:1px solid transparent;
+  cursor:pointer;
+  text-decoration:none;
+  transition:.16s ease;
+  font-size:13px;
+  font-weight:600;
+}
+.btn-primary{
+  background:var(--accent);
+  border-color:var(--accent);
+  color:#111;
+}
+.btn-primary:hover{background:#e6b341;border-color:#e6b341}
+.btn-secondary{
+  background:var(--panel-2);
+  border-color:var(--line);
+  color:var(--text-soft);
+}
+.btn-secondary:hover{border-color:rgba(215,163,43,.35);color:var(--text)}
+.btn-danger{background:var(--red);border-color:var(--red);color:#fff}
+.btn-danger:hover{background:#d25f5f;border-color:#d25f5f}
+.btn-ghost{
+  background:transparent;
+  border-color:var(--line);
+  color:var(--muted);
+}
+.btn-ghost:hover{border-color:var(--text-soft);color:var(--text-soft)}
+.field-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.field{display:flex;flex-direction:column;gap:7px}
+.label{
+  font-family:'DM Mono',monospace;
+  font-size:10px;
+  letter-spacing:1.4px;
+  text-transform:uppercase;
+  color:var(--muted);
+}
+.input,
+.select,
+.textarea{
+  width:100%;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:var(--panel-2);
+  color:var(--text);
+  padding:11px 13px;
+  outline:none;
+  transition:border-color .16s ease, box-shadow .16s ease;
+}
+.textarea{min-height:130px;resize:vertical;line-height:1.65}
+.input:focus,.select:focus,.textarea:focus{
+  border-color:rgba(215,163,43,.4);
+  box-shadow:0 0 0 3px rgba(215,163,43,.08);
+}
+.badge{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:5px 10px;
+  border-radius:999px;
+  border:1px solid var(--line);
+  background:var(--panel-2);
+  color:var(--text-soft);
+  font-family:'DM Mono',monospace;
+  font-size:10px;
+  letter-spacing:1px;
+  text-transform:uppercase;
+}
+.badge.success{color:var(--green);border-color:rgba(77,187,122,.28);background:rgba(77,187,122,.08)}
+.badge.warning{color:var(--yellow);border-color:rgba(215,163,43,.28);background:rgba(215,163,43,.08)}
+.badge.danger{color:var(--red);border-color:rgba(196,81,81,.28);background:rgba(196,81,81,.08)}
+.badge.info{color:var(--blue);border-color:rgba(91,143,215,.28);background:rgba(91,143,215,.08)}
+.empty-state{
+  padding:42px 20px;
+  text-align:center;
+  color:var(--muted);
+}
+.empty-title{
+  margin-top:10px;
+  color:var(--text-soft);
+  font-family:'Crimson Pro',serif;
+  font-size:24px;
+}
+.empty-copy{
+  max-width:580px;
+  margin:10px auto 0;
+  font-size:14px;
+  line-height:1.7;
+}
+.list-clean{list-style:none}
+.inline-actions{display:flex;flex-wrap:wrap;gap:10px}
+.flash-inline{
+  padding:12px 14px;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:var(--panel-2);
+  color:var(--text-soft);
+  font-size:13px;
+  line-height:1.6;
+}
+.muted{color:var(--muted)}
+.mono{font-family:'DM Mono',monospace}
+@media (max-width: 1180px){
+  .kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width: 980px){
+  .app-shell{grid-template-columns:1fr}
+  .sidebar{position:relative;height:auto;border-right:none;border-bottom:1px solid var(--line)}
+  .topbar{position:relative}
+}
+@media (max-width: 760px){
+  .page-shell,.topbar{padding-left:18px;padding-right:18px}
+  .field-grid,.kpi-grid{grid-template-columns:1fr}
+  .topbar{flex-direction:column}
+  .topbar-actions{justify-content:flex-start}
+}
+</style>
+{% block page_styles %}{% endblock %}
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand-kicker">TaxLab IA</span>
+      <div class="brand-title">Motor de evidencia tributaria</div>
+      <div class="brand-copy">Base publica SII, jurisprudencia judicial, casos privados y herramientas para trabajo profesional chileno.</div>
+    </div>
+
+    <div class="sidebar-group">
+      <div class="sidebar-label">Base publica SII</div>
+      <a href="/app" class="nav-link {{ 'is-active' if active_section == 'dashboard' else '' }}">
+        <span class="nav-copy"><span class="nav-title">Dashboard</span><span class="nav-sub">Vista general del producto</span></span>
+      </a>
+      <a href="/app/buscar" class="nav-link {{ 'is-active' if active_section == 'buscar' else '' }}">
+        <span class="nav-copy"><span class="nav-title">Busqueda</span><span class="nav-sub">Corpus publico del SII</span></span>
+      </a>
+      <a href="/app/asistente" class="nav-link {{ 'is-active' if active_section == 'asistente' else '' }}">
+        <span class="nav-copy"><span class="nav-title">Asistente</span><span class="nav-sub">Chat con evidencia y citas</span></span>
+      </a>
+    </div>
+
+    <div class="sidebar-group">
+      <div class="sidebar-label">Casos privados</div>
+      <a href="/app/casos" class="nav-link {{ 'is-active' if active_section == 'casos' else '' }}">
+        <span class="nav-copy"><span class="nav-title">Casos</span><span class="nav-sub">Vaults por cliente y asunto</span></span>
+      </a>
+      <a href="/app/toolkit" class="nav-link {{ 'is-active' if active_section == 'toolkit' else '' }}">
+        <span class="nav-copy"><span class="nav-title">Toolkit</span><span class="nav-sub">Calculadoras y utilidades</span></span>
+      </a>
+    </div>
+
+    <div class="sidebar-group">
+      <div class="sidebar-label">Admin</div>
+      <a href="/admin/scraper" class="nav-link {{ 'is-active' if active_section == 'admin_scraper' else '' }}">
+        <span class="nav-copy"><span class="nav-title">Panel de scraping</span><span class="nav-sub">Estado y control del corpus</span></span>
+      </a>
+      <a href="/admin/ingestion" class="nav-link {{ 'is-active' if active_section == 'admin_ingestion' else '' }}">
+        <span class="nav-copy"><span class="nav-title">Ingestion</span><span class="nav-sub">Futuros conectores y QA</span></span>
+      </a>
+      <a href="/agregar" class="nav-link {{ 'is-active' if active_section == 'agregar' else '' }}">
+        <span class="nav-copy"><span class="nav-title">Agregar</span><span class="nav-sub">Carga manual de documentos</span></span>
+      </a>
+    </div>
+
+    <dl class="sidebar-foot">
+      <dt>Corpus</dt>
+      <dd>{% if shell_total_docs is defined %}{{ '{:,}'.format(shell_total_docs).replace(',', '.') }} documentos indexados{% else %}Corpus publico curado{% endif %}</dd>
+      <dt>Stack actual</dt>
+      <dd>Flask + SQLite + FTS5 + scrapers SII</dd>
+      <dt>Modo de producto</dt>
+      <dd>Citas, trazabilidad y evidencia por fuente.</dd>
+    </dl>
+  </aside>
+
+  <div class="main-shell">
+    <header class="topbar">
+      <div>
+        <div class="topbar-title">{{ page_title or 'TaxLab IA' }}</div>
+        <div class="topbar-copy">{{ page_subtitle or 'Plataforma tributaria chilena basada en evidencia documental y flujos reales de trabajo.' }}</div>
+      </div>
+      <div class="topbar-actions">{% block top_actions %}{% endblock %}</div>
+    </header>
+
+    <main class="page-shell {% block page_shell_class %}{% endblock %}">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+{% block page_scripts %}{% endblock %}
+</body>
+</html>

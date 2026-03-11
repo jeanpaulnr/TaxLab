@@ -1,0 +1,48 @@
+﻿{% extends 'base.html' %}
+
+{% block title %}Toolkit | TaxLab IA{% endblock %}
+
+{% block top_actions %}
+<a class="btn btn-secondary" href="/app/casos">Ir a casos</a>
+{% endblock %}
+
+{% block content %}
+<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;align-items:start;">
+  <section class="card">
+    <div class="card-head"><div class="card-title">Plazos tributarios</div></div>
+    <div class="card-body">
+      <div class="badge warning">Stub</div>
+      <div style="margin-top:12px;font-family:'Crimson Pro',serif;font-size:28px;font-weight:700;">Calculadora de plazos</div>
+      <p style="margin-top:10px;color:var(--text-soft);line-height:1.75;font-size:14px;">Base para prescripcion, citaciones, liquidaciones, recursos y ventanas procesales. En este sprint queda solo la estructura del modulo.</p>
+      <div class="flash-inline" style="margin-top:14px;">TODO: parametrizar reglas de Codigo Tributario, LPPA y contencioso tributario.</div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><div class="card-title">Calendario tributario</div></div>
+    <div class="card-body">
+      <div class="badge info">Stub</div>
+      <div style="margin-top:12px;font-family:'Crimson Pro',serif;font-size:28px;font-weight:700;">Calendario operativo</div>
+      <p style="margin-top:10px;color:var(--text-soft);line-height:1.75;font-size:14px;">Espacio para F29, F22, DDJJ y fechas criticas por regimen o contribuyente. Luego puede conectarse a casos y alertas.</p>
+      <div class="flash-inline" style="margin-top:14px;">TODO: unificar vencimientos por formulario y tipo de obligacion.</div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><div class="card-title">Indicadores historicos</div></div>
+    <div class="card-body">
+      <div class="badge">Stub</div>
+      <div style="margin-top:12px;font-family:'Crimson Pro',serif;font-size:28px;font-weight:700;">UTM, UF y UTA</div>
+      <p style="margin-top:10px;color:var(--text-soft);line-height:1.75;font-size:14px;">Reserva el lugar para tablas historicas reutilizables en liquidaciones, notas y reportes del estudio.</p>
+      <div class="flash-inline" style="margin-top:14px;">TODO: ingestiones controladas desde fuentes oficiales y cache local.</div>
+    </div>
+  </section>
+</div>
+
+<section class="card" style="margin-top:18px;">
+  <div class="card-head"><div class="card-title">Enfoque del toolkit</div></div>
+  <div class="card-body">
+    <div class="flash-inline">El toolkit no compite con el corpus documental. Lo complementa con herramientas de ahorro de tiempo que un contador o abogado tributarista pueda usar sin friccion, desde la misma plataforma.</div>
+  </div>
+</section>
+{% endblock %}

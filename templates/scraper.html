@@ -1,268 +1,183 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Panel Scraper · SII Normativa</title>
-<link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@600;700&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+﻿{% extends 'base.html' %}
+
+{% block title %}Scraper | TaxLab IA{% endblock %}
+
+{% block top_actions %}
+<a class="btn btn-secondary" href="/app/buscar">Volver a base publica</a>
+{% endblock %}
+
+{% block page_styles %}
 <style>
-:root{--bg:#0e0e0e;--s:#161616;--s2:#1e1e1e;--s3:#262626;--ink:#f0ece4;--ink2:#b8b0a4;--muted:#6b6460;--rule:#2a2a2a;--gold:#c8991e;--gold-lt:#e8b83a;--green:#3abf6a;--red:#bf3a3a;--blue:#3a7abf;--orange:#bf7a3a}
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);font-size:13px}
-header{background:var(--s);border-bottom:1px solid var(--rule);display:flex;align-items:center;justify-content:space-between;padding:0 1.5rem;height:52px}
-.logo{display:flex;align-items:center;gap:10px;text-decoration:none}
-.logo-badge{font-family:'DM Mono',monospace;font-size:10px;padding:3px 8px;border:1px solid var(--gold);border-radius:3px;color:var(--gold);letter-spacing:1px}
-.logo-name{font-family:'Crimson Pro',serif;font-size:18px;font-weight:600;color:var(--ink)}
-nav{display:flex;gap:2px}
-nav a{padding:5px 12px;border-radius:3px;font-size:12px;font-weight:500;text-decoration:none;color:var(--ink2);transition:all .15s}
-nav a:hover{background:var(--s3);color:var(--ink)}
-nav a.active{color:var(--gold);background:rgba(200,153,30,.12)}
-main{max-width:1100px;margin:0 auto;padding:32px 1.5rem 80px}
-h1{font-family:'Crimson Pro',serif;font-size:28px;font-weight:700;margin-bottom:6px}
-.sub{color:var(--muted);font-size:13px;margin-bottom:28px;line-height:1.6}
-
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
-.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px}
-
-.card{background:var(--s);border:1px solid var(--rule);border-radius:5px;overflow:hidden;margin-bottom:16px}
-.card-h{background:var(--s2);border-bottom:1px solid var(--rule);padding:10px 16px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--gold);text-transform:uppercase;display:flex;align-items:center;justify-content:space-between}
-.card-b{padding:20px}
-.fg{display:flex;flex-direction:column;gap:5px}
-label{font-size:10px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
-select,input{width:100%;padding:8px 10px;background:var(--s2);border:1px solid var(--rule);border-radius:3px;font-family:'DM Sans',sans-serif;font-size:12px;color:var(--ink);outline:none;transition:border-color .2s;appearance:none}
-select:focus,input:focus{border-color:var(--gold)}
-select option{background:var(--s)}
-.btn{padding:9px 16px;border-radius:3px;font-size:12px;font-weight:600;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all .15s;font-family:'DM Sans',sans-serif;letter-spacing:.2px}
-.btn-gold{background:var(--gold);color:#000}.btn-gold:hover{background:var(--gold-lt)}.btn-gold:disabled{opacity:.4;cursor:not-allowed}
-.btn-red{background:var(--red);color:#fff}.btn-red:hover{background:#d94040}.btn-red:disabled{opacity:.4}
-.btn-surface{background:var(--s2);border:1px solid var(--rule);color:var(--ink2)}.btn-surface:hover{border-color:var(--gold);color:var(--gold)}
-.btn-full{width:100%;justify-content:center}
-.btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
-
-/* Kpis */
-.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
-.kpi{background:var(--s2);border:1px solid var(--rule);border-radius:4px;padding:14px;text-align:center}
-.kpi-n{font-family:'DM Mono',monospace;font-size:24px;font-weight:500;color:var(--gold);margin-bottom:4px}
-.kpi-l{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
-
-/* Progress */
-#prog-wrap{display:none;margin-top:16px}
-.prog-bar-bg{background:var(--s3);border-radius:100px;height:5px;margin:10px 0}
-.prog-bar{background:var(--gold);height:5px;border-radius:100px;width:0;transition:width .4s}
-.prog-lbl{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);margin-bottom:6px}
-
-/* Log terminal */
-.terminal{
-  background:#050505;border:1px solid var(--rule);border-radius:4px;
-  padding:12px;height:280px;overflow-y:auto;
-  font-family:'DM Mono',monospace;font-size:11px;line-height:1.7;
-}
-.log-ok{color:#3abf6a}.log-err{color:#bf3a3a}.log-info{color:#6b6460}.log-warn{color:#c8991e}
-
-/* Warn box */
-.warn{background:rgba(191,58,58,.08);border:1px solid rgba(191,58,58,.2);border-radius:3px;padding:12px 14px;font-size:12px;line-height:1.65;color:#c87a7a;margin-bottom:16px}
-.warn strong{color:var(--red)}
-
-/* Table */
-table{width:100%;border-collapse:collapse;font-size:11px}
-th{text-align:left;padding:7px 10px;font-family:'DM Mono',monospace;font-size:8px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;border-bottom:2px solid var(--rule)}
-td{padding:7px 10px;border-bottom:1px solid var(--rule);color:var(--ink2)}
-tr:hover td{background:var(--s2)}
-.e-ok{color:var(--green)}.e-err{color:var(--red)}.e-skip{color:var(--muted)}
-
-/* Tips */
-.tip-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
-.tip{background:var(--s2);border:1px solid var(--rule);border-radius:4px;padding:14px}
-.tip-t{font-family:'DM Mono',monospace;font-size:9px;color:var(--gold);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px}
-.tip-d{font-size:11px;color:var(--ink2);line-height:1.6}
-.tip-d code{background:var(--s3);padding:1px 5px;border-radius:2px;font-family:'DM Mono',monospace;font-size:10px;color:var(--gold-lt)}
+.scraper-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:start}
+.scraper-grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.kpi-grid-local{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:18px}
+.kpi-local{padding:18px;border:1px solid var(--line);border-radius:16px;background:var(--panel)}
+.kpi-local .value{font-family:'Crimson Pro',serif;font-size:34px;font-weight:700;color:var(--accent);line-height:1}
+.kpi-local .label{margin-top:8px;font-size:12px;color:var(--text-soft);text-transform:none;letter-spacing:0;font-family:'DM Sans',sans-serif}
+.terminal{min-height:300px;max-height:420px;overflow:auto;padding:14px;border:1px solid var(--line);border-radius:14px;background:#040404;font-family:'DM Mono',monospace;font-size:12px;line-height:1.7}
+.log-ok{color:var(--green)}
+.log-err{color:var(--red)}
+.log-info{color:var(--muted)}
+.log-warn{color:var(--accent)}
+.warn-box{padding:14px 16px;border:1px solid rgba(196,81,81,.28);border-radius:14px;background:rgba(196,81,81,.08);color:#d79b9b;font-size:13px;line-height:1.75}
+.summary-table{width:100%;border-collapse:collapse;font-size:12px}
+.summary-table th,.summary-table td{padding:10px 12px;border-bottom:1px solid var(--line-soft);text-align:left}
+.summary-table th{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted)}
+.summary-table td{color:var(--text-soft)}
+.progress-wrap{display:none;margin-bottom:14px}
+.progress-meta{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);margin-bottom:8px}
+.progress-bar{height:8px;border-radius:999px;background:var(--panel-3);overflow:hidden}
+.progress-fill{height:100%;width:0;background:var(--accent);transition:width .3s ease}
+@media (max-width: 1100px){.scraper-grid,.scraper-grid-3,.kpi-grid-local{grid-template-columns:1fr}}
 </style>
-</head>
-<body>
-<header>
-  <a href="/" class="logo"><span class="logo-badge">SII</span><span class="logo-name">Normativa</span></a>
-  <nav>
-    <a href="/">Búsqueda</a>
-    <a href="/scraper" class="active">Scraper</a>
-    <a href="/agregar">+ Agregar</a>
-  </nav>
-</header>
+{% endblock %}
 
-<main>
-  <h1>🕷️ Panel de Scraping</h1>
-  <p class="sub">Descarga PDFs desde sii.cl · Extracción con PyMuPDF · 100% fidelidad · Actualización diaria 08:00 AM</p>
+{% block content %}
+<div class="kpi-grid-local">
+  <div class="kpi-local"><div class="value" id="k-nuevos">0</div><div class="label">Nuevos hoy</div></div>
+  <div class="kpi-local"><div class="value" id="k-proc">0</div><div class="label">Procesados en sesion</div></div>
+  <div class="kpi-local"><div class="value" id="k-err">0</div><div class="label">Errores o no encontrados</div></div>
+  <div class="kpi-local"><div class="value" id="k-estado" style="font-size:20px;">Inactivo</div><div class="label">Estado del motor</div></div>
+</div>
 
-  <!-- KPIs en tiempo real -->
-  <div class="kpi-grid" id="kpis">
-    <div class="kpi"><div class="kpi-n" id="k-nuevos">0</div><div class="kpi-l">Nuevos hoy</div></div>
-    <div class="kpi"><div class="kpi-n" id="k-proc">0</div><div class="kpi-l">Procesados sesión</div></div>
-    <div class="kpi"><div class="kpi-n" id="k-err">0</div><div class="kpi-l">No encontrados</div></div>
-    <div class="kpi"><div class="kpi-n" id="k-estado" style="font-size:14px;color:var(--muted)">Inactivo</div><div class="kpi-l">Estado</div></div>
-  </div>
+<div class="warn-box" style="margin-bottom:18px;">
+  El scraper real se mantiene intacto. Este panel solo reorganiza la operacion: prueba por anio primero, luego corre historicos largos en segundo plano y usa el polling para monitorear progreso.
+</div>
 
-  <div class="warn">
-    <strong>⚠ Lee esto antes de ejecutar:</strong> El scraper accede a sii.cl con pausas de 1+ seg entre requests.
-    La descarga histórica completa (1990–2025) puede tomar <strong>24–48 horas</strong> corriendo sin interrupción.
-    Empieza con un año reciente para verificar que funciona, luego lanza el histórico por partes.
-  </div>
-
-  <div class="grid2">
-    <!-- Panel: Año específico -->
-    <div class="card">
-      <div class="card-h">🔄 Descarga por año / tipo</div>
-      <div class="card-b">
-        <div class="grid2" style="margin-bottom:12px">
-          <div class="fg">
-            <label>Tipo</label>
-            <select id="sc-tipo">
-              <option value="circular">Circulares</option>
-              <option value="resolucion">Resoluciones</option>
-              <option value="oficio_lir">Oficios — LIR (Renta)</option>
-              <option value="oficio_iva">Oficios — IVA</option>
-              
-              <option value="oficio_otras">Oficios — Otras Normas (CT/Timbres/Herencias)</option>
-            </select>
-          </div>
-          <div class="fg">
-            <label>Año</label>
-            <select id="sc-anio">
-              {% for a in range(2025,1989,-1) %}<option value="{{ a }}">{{ a }}</option>{% endfor %}
-            </select>
-          </div>
-        </div>
-        <div class="fg" style="margin-bottom:12px">
-          <label>Pausa entre requests (seg)</label>
-          <input type="number" id="sc-delay" value="1.0" min="0.5" max="5" step="0.5">
-        </div>
-        <button class="btn btn-gold btn-full" id="btn-anio" onclick="iniciarAnio()">▶ Descargar año</button>
-      </div>
-    </div>
-
-    <!-- Panel: Verificar novedades -->
-    <div class="card">
-      <div class="card-h">📡 Verificación de novedades</div>
-      <div class="card-b">
-        <p style="font-size:12px;color:var(--ink2);line-height:1.7;margin-bottom:16px">
-          Verifica si hay documentos <strong>nuevos del año actual</strong> en todos los tipos.<br><br>
-          El scheduler hace esto <strong>automáticamente a las 08:00 AM</strong> cada día cuando la app está corriendo.
-        </p>
-        <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);margin-bottom:14px">
-          Última ejecución scheduler:<br>
-          <span style="color:var(--gold)">{{ ultima_ejecucion }}</span>
-        </div>
-        <button class="btn btn-surface btn-full" id="btn-nov" onclick="checkNovedades()">
-          🔍 Verificar novedades ahora
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Panel: Descarga histórica -->
-  <div class="card">
-    <div class="card-h">📚 Descarga histórica masiva <span style="color:var(--muted);font-size:8px">LONG-RUNNING — puede tomar horas</span></div>
-    <div class="card-b">
-      <div class="grid3" style="margin-bottom:14px">
-        <div class="fg">
-          <label>Año desde</label>
-          <select id="h-desde">
-            {% for a in range(2025,1989,-1) %}<option value="{{ a }}" {% if a==2015 %}selected{% endif %}>{{ a }}</option>{% endfor %}
+<div class="scraper-grid">
+  <section class="card">
+    <div class="card-head"><div class="card-title">Descarga por anio / tipo</div></div>
+    <div class="card-body">
+      <div class="scraper-grid" style="grid-template-columns:1fr 1fr;gap:14px;">
+        <div class="field">
+          <label class="label">Tipo</label>
+          <select id="sc-tipo" class="select">
+            <option value="circular">Circulares</option>
+            <option value="resolucion">Resoluciones</option>
+            <option value="oficio_lir">Oficios - LIR</option>
+            <option value="oficio_iva">Oficios - IVA</option>
+            <option value="oficio_otras">Oficios - Otras normas</option>
           </select>
         </div>
-        <div class="fg">
-          <label>Año hasta</label>
-          <select id="h-hasta">
-            {% for a in range(2025,1989,-1) %}<option value="{{ a }}" {% if a==2025 %}selected{% endif %}>{{ a }}</option>{% endfor %}
+        <div class="field">
+          <label class="label">Anio</label>
+          <select id="sc-anio" class="select">
+            {% for a in range(anio_actual, 1989, -1) %}
+            <option value="{{ a }}">{{ a }}</option>
+            {% endfor %}
           </select>
         </div>
-        <div class="fg">
-          <label>Pausa (seg)</label>
-          <input type="number" id="h-delay" value="1.5" min="1" max="5" step="0.5">
-        </div>
       </div>
-      <div style="margin-bottom:14px">
-        <label style="display:block;margin-bottom:8px">Tipos a descargar</label>
-        <div style="display:flex;flex-wrap:wrap;gap:8px">
-          <label style="text-transform:none;letter-spacing:0;display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="h-circ" checked> Circulares</label>
-          <label style="text-transform:none;letter-spacing:0;display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="h-reso" checked> Resoluciones</label>
-          <label style="text-transform:none;letter-spacing:0;display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="h-lir" checked> Oficios LIR</label>
-          <label style="text-transform:none;letter-spacing:0;display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="h-iva" checked> Oficios IVA</label>
-          <label style="text-transform:none;letter-spacing:0;display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="h-otras"> Otras Normas</label>
-        </div>
+      <div class="field" style="margin-top:14px;">
+        <label class="label">Pausa entre requests (seg)</label>
+        <input id="sc-delay" class="input" type="number" min="0.5" max="5" step="0.5" value="1.0">
       </div>
-      <div class="btn-row">
-        <button class="btn btn-gold" id="btn-hist" onclick="iniciarHistorico()">🚀 Iniciar descarga histórica</button>
-        <button class="btn btn-red"  id="btn-stop" onclick="detener()" disabled>⏹ Detener</button>
+      <div class="inline-actions" style="margin-top:16px;">
+        <button class="btn btn-primary" id="btn-anio" onclick="iniciarAnio()">Descargar anio</button>
       </div>
     </div>
-  </div>
+  </section>
 
-  <!-- Log en tiempo real -->
-  <div class="card">
-    <div class="card-h">
-      📟 Log en tiempo real
-      <button class="btn btn-surface" style="padding:3px 8px;font-size:9px" onclick="limpiarLog()">Limpiar</button>
-    </div>
-    <div class="card-b" style="padding:12px">
-      <div id="prog-wrap">
-        <div class="prog-lbl" id="prog-lbl">Iniciando…</div>
-        <div class="prog-bar-bg"><div class="prog-bar" id="prog-bar"></div></div>
-      </div>
-      <div class="terminal" id="log"></div>
-    </div>
-  </div>
-
-  <!-- Tips de uso -->
-  <div class="card">
-    <div class="card-h">💡 Estrategia de descarga recomendada</div>
-    <div class="card-b" style="padding:16px">
-      <div class="tip-grid">
-        <div class="tip">
-          <div class="tip-t">1. Prueba inicial (5 min)</div>
-          <div class="tip-d">Descarga <code>Circulares 2024</code>. Verifica que los PDFs se extraen bien y aparecen en búsqueda.</div>
-        </div>
-        <div class="tip">
-          <div class="tip-t">2. Años recientes (1-2 horas)</div>
-          <div class="tip-d">Histórico <code>2020-2025</code> con todos los tipos. Esto te da ~5 años de jurisprudencia completa.</div>
-        </div>
-        <div class="tip">
-          <div class="tip-t">3. Histórico completo (24-48 hrs)</div>
-          <div class="tip-d">Histórico <code>1990-2019</code> en segundo plano. El sistema puede quedar corriendo de noche.</div>
-        </div>
-        <div class="tip">
-          <div class="tip-t">4. Actualización diaria (automática)</div>
-          <div class="tip-d">El scheduler verifica novedades cada día a las 08:00 AM. Solo descarga lo nuevo.</div>
-        </div>
+  <section class="card">
+    <div class="card-head"><div class="card-title">Verificacion de novedades</div></div>
+    <div class="card-body">
+      <div class="flash-inline">Consulta si hay documentos nuevos del anio actual en los tipos soportados. El scheduler diario sigue ejecutandose aparte.</div>
+      <div style="margin-top:14px;color:var(--muted);font-size:13px;line-height:1.7;">Ultima ejecucion scheduler: <strong style="color:var(--text);">{{ ultima_ejecucion }}</strong></div>
+      <div class="inline-actions" style="margin-top:16px;">
+        <button class="btn btn-secondary" id="btn-nov" onclick="checkNovedades()">Verificar ahora</button>
       </div>
     </div>
-  </div>
+  </section>
+</div>
 
-  {% if resumen %}
-  <div class="card">
-    <div class="card-h">📊 Resumen por tipo y año</div>
-    <div class="card-b" style="padding:0">
-      <table>
-        <thead><tr><th>Tipo</th><th>Año</th><th>Intentados</th><th>Descargados</th><th>%</th></tr></thead>
-        <tbody>
-          {% for r in resumen %}
-          <tr>
-            <td>{{ r.tipo }}</td><td>{{ r.anio }}</td>
-            <td>{{ r.cnt }}</td>
-            <td class="e-ok">{{ r.ok }}</td>
-            <td>{{ "%.0f"|format(r.ok/r.cnt*100 if r.cnt else 0) }}%</td>
-          </tr>
+<section class="card" style="margin-top:18px;">
+  <div class="card-head"><div class="card-title">Descarga historica masiva</div></div>
+  <div class="card-body">
+    <div class="scraper-grid-3">
+      <div class="field">
+        <label class="label">Anio desde</label>
+        <select id="h-desde" class="select">
+          {% for a in range(anio_actual, 1989, -1) %}
+          <option value="{{ a }}" {% if a == 2015 %}selected{% endif %}>{{ a }}</option>
           {% endfor %}
-        </tbody>
-      </table>
+        </select>
+      </div>
+      <div class="field">
+        <label class="label">Anio hasta</label>
+        <select id="h-hasta" class="select">
+          {% for a in range(anio_actual, 1989, -1) %}
+          <option value="{{ a }}" {% if a == anio_actual %}selected{% endif %}>{{ a }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label class="label">Pausa (seg)</label>
+        <input id="h-delay" class="input" type="number" min="1" max="5" step="0.5" value="1.5">
+      </div>
+    </div>
+    <div style="margin-top:16px;">
+      <label class="label">Tipos a descargar</label>
+      <div class="inline-actions" style="margin-top:10px;">
+        <label class="badge"><input id="h-circ" type="checkbox" checked> Circular</label>
+        <label class="badge"><input id="h-reso" type="checkbox" checked> Resolucion</label>
+        <label class="badge"><input id="h-lir" type="checkbox" checked> Oficio LIR</label>
+        <label class="badge"><input id="h-iva" type="checkbox" checked> Oficio IVA</label>
+        <label class="badge"><input id="h-otras" type="checkbox"> Oficio otras</label>
+      </div>
+    </div>
+    <div class="inline-actions" style="margin-top:16px;">
+      <button class="btn btn-primary" id="btn-hist" onclick="iniciarHistorico()">Iniciar historico</button>
+      <button class="btn btn-danger" id="btn-stop" onclick="detener()" disabled>Detener</button>
     </div>
   </div>
-  {% endif %}
-</main>
+</section>
 
+<section class="card" style="margin-top:18px;">
+  <div class="card-head">
+    <div class="card-title">Log en tiempo real</div>
+    <button class="btn btn-ghost" onclick="limpiarLog()">Limpiar</button>
+  </div>
+  <div class="card-body tight">
+    <div class="progress-wrap" id="prog-wrap">
+      <div class="progress-meta" id="prog-lbl">Iniciando...</div>
+      <div class="progress-bar"><div class="progress-fill" id="prog-bar"></div></div>
+    </div>
+    <div class="terminal" id="log"></div>
+  </div>
+</section>
+
+{% if resumen %}
+<section class="card" style="margin-top:18px;">
+  <div class="card-head"><div class="card-title">Resumen por tipo y anio</div></div>
+  <div class="card-body tight">
+    <table class="summary-table">
+      <thead>
+        <tr><th>Tipo</th><th>Anio</th><th>Intentados</th><th>Descargados</th><th>%</th></tr>
+      </thead>
+      <tbody>
+        {% for row in resumen %}
+        <tr>
+          <td>{{ row.tipo }}</td>
+          <td>{{ row.anio }}</td>
+          <td>{{ row.cnt }}</td>
+          <td>{{ row.ok }}</td>
+          <td>{{ '%.0f'|format(row.ok / row.cnt * 100 if row.cnt else 0) }}%</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+{% endblock %}
+
+{% block page_scripts %}
 <script>
 let progVal = 0;
 
 function log(msg, cls='log-info'){
   const el = document.getElementById('log');
-  const ts = new Date().toTimeString().slice(0,8);
+  const ts = new Date().toTimeString().slice(0, 8);
   const div = document.createElement('div');
   div.className = cls;
   div.textContent = `[${ts}] ${msg}`;
@@ -270,107 +185,124 @@ function log(msg, cls='log-info'){
   el.scrollTop = el.scrollHeight;
 }
 
-function limpiarLog(){ document.getElementById('log').innerHTML=''; }
+function limpiarLog(){ document.getElementById('log').innerHTML = ''; }
 
 function setBtns(running){
   document.getElementById('btn-anio').disabled = running;
   document.getElementById('btn-hist').disabled = running;
-  document.getElementById('btn-nov').disabled  = running;
+  document.getElementById('btn-nov').disabled = running;
   document.getElementById('btn-stop').disabled = !running;
-  document.getElementById('k-estado').textContent = running ? '🔄 Activo' : 'Inactivo';
-  document.getElementById('k-estado').style.color = running ? 'var(--gold)' : 'var(--muted)';
+  document.getElementById('k-estado').textContent = running ? 'Activo' : 'Inactivo';
+  document.getElementById('k-estado').style.color = running ? 'var(--accent)' : 'var(--text-soft)';
   document.getElementById('prog-wrap').style.display = running ? 'block' : 'none';
 }
 
 async function iniciarAnio(){
-  const tipo  = document.getElementById('sc-tipo').value;
-  const anio  = parseInt(document.getElementById('sc-anio').value);
+  const tipo = document.getElementById('sc-tipo').value;
+  const anio = parseInt(document.getElementById('sc-anio').value, 10);
   const delay = parseFloat(document.getElementById('sc-delay').value);
-  const r = await fetch('/api/scraper/iniciar',{
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({tipo, anio_desde:anio, anio_hasta:anio, delay})
+  const response = await fetch('/api/scraper/iniciar', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({tipo, anio_desde: anio, anio_hasta: anio, delay})
   });
-  const d = await r.json();
-  if(d.ok){ log(`Iniciando ${tipo.toUpperCase()} ${anio}…`, 'log-warn'); setBtns(true); poll(); }
-  else log('Error: '+d.msg, 'log-err');
+  const data = await response.json();
+  if(data.ok){
+    log(`Iniciando ${tipo.toUpperCase()} ${anio}...`, 'log-warn');
+    setBtns(true);
+    poll();
+  } else {
+    log('Error: ' + (data.msg || 'No fue posible iniciar el scraper.'), 'log-err');
+  }
 }
 
 async function iniciarHistorico(){
-  const desde = parseInt(document.getElementById('h-desde').value);
-  const hasta = parseInt(document.getElementById('h-hasta').value);
+  const desde = parseInt(document.getElementById('h-desde').value, 10);
+  const hasta = parseInt(document.getElementById('h-hasta').value, 10);
   const delay = parseFloat(document.getElementById('h-delay').value);
   const tipos = [];
   if(document.getElementById('h-circ').checked) tipos.push('circular');
   if(document.getElementById('h-reso').checked) tipos.push('resolucion');
-  if(document.getElementById('h-lir').checked)  tipos.push('oficio_lir');
-  if(document.getElementById('h-iva').checked)  tipos.push('oficio_iva');
+  if(document.getElementById('h-lir').checked) tipos.push('oficio_lir');
+  if(document.getElementById('h-iva').checked) tipos.push('oficio_iva');
   if(document.getElementById('h-otras').checked) tipos.push('oficio_otras');
-  if(!tipos.length){ alert('Selecciona al menos un tipo'); return; }
-  const r = await fetch('/api/scraper/historico',{
-    method:'POST', headers:{'Content-Type':'application/json'},
+  if(!tipos.length){
+    alert('Selecciona al menos un tipo de descarga.');
+    return;
+  }
+  const response = await fetch('/api/scraper/historico', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({tipos, desde, hasta, delay})
   });
-  const d = await r.json();
-  if(d.ok){ log(`Histórico ${desde}-${hasta}: ${tipos.join(', ')}`, 'log-warn'); setBtns(true); poll(); }
-  else log('Error: '+d.msg, 'log-err');
+  const data = await response.json();
+  if(data.ok){
+    log(`Historico ${desde}-${hasta}: ${tipos.join(', ')}`, 'log-warn');
+    setBtns(true);
+    poll();
+  } else {
+    log('Error: ' + (data.msg || 'No fue posible iniciar el historico.'), 'log-err');
+  }
 }
 
 async function checkNovedades(){
-  const r = await fetch('/api/scraper/novedades',{method:'POST'});
-  const d = await r.json();
-  if(d.ok){ log('Verificando novedades año actual…', 'log-warn'); setBtns(true); poll(); }
-  else log('Error: '+d.msg, 'log-err');
+  const response = await fetch('/api/scraper/novedades', {method: 'POST'});
+  const data = await response.json();
+  if(data.ok){
+    log('Verificando novedades del anio actual...', 'log-warn');
+    setBtns(true);
+    poll();
+  } else {
+    log('Error: ' + (data.msg || 'No fue posible verificar novedades.'), 'log-err');
+  }
 }
 
 async function detener(){
-  await fetch('/api/scraper/detener',{method:'POST'});
+  await fetch('/api/scraper/detener', {method: 'POST'});
   setBtns(false);
 }
 
 async function poll(){
-  const r = await fetch('/api/scraper/status');
-  const d = await r.json();
+  const response = await fetch('/api/scraper/status');
+  const data = await response.json();
+  document.getElementById('k-proc').textContent = data.procesados;
+  document.getElementById('k-err').textContent = data.errores;
 
-  // KPIs
-  document.getElementById('k-proc').textContent = d.procesados;
-  document.getElementById('k-err').textContent  = d.errores;
-
-  // Mensajes nuevos
-  for(const m of (d.messages||[])){
-    let cls = m.ok ? 'log-ok' : 'log-err';
-    if(m.msg.startsWith('─'))  cls='log-info';
-    if(m.msg.startsWith('⚠'))  cls='log-warn';
-    if(m.msg.startsWith('✔'))  cls='log-ok';
-    if(m.msg === 'SCRAPER_DONE'){ setBtns(false); continue; }
-    if(m.msg.startsWith('DONE|')) continue;
-    log(m.msg, cls);
+  for(const message of (data.messages || [])){
+    let cls = message.ok ? 'log-ok' : 'log-err';
+    if(message.msg.startsWith('─')) cls = 'log-info';
+    if(message.msg.startsWith('⚠')) cls = 'log-warn';
+    if(message.msg.startsWith('✔') || message.msg.startsWith('✅')) cls = 'log-ok';
+    if(message.msg === 'SCRAPER_DONE'){ setBtns(false); continue; }
+    if(message.msg.startsWith('DONE|')) continue;
+    log(message.msg, cls);
     progVal = Math.min(progVal + 0.5, 95);
     document.getElementById('prog-bar').style.width = progVal + '%';
-    document.getElementById('prog-lbl').textContent = m.msg;
+    document.getElementById('prog-lbl').textContent = message.msg;
   }
 
-  if(d.running) setTimeout(poll, 1500);
-  else{
+  if(data.running){
+    setTimeout(poll, 1500);
+  } else {
     document.getElementById('prog-bar').style.width = '100%';
     document.getElementById('prog-bar').style.background = 'var(--green)';
     setBtns(false);
     progVal = 0;
-    // Refresh stats
-    setTimeout(()=>fetch('/api/stats').then(r=>r.json()).then(d=>{
-      document.getElementById('k-nuevos').textContent = d.nuevos_hoy || 0;
+    setTimeout(() => fetch('/api/stats').then(r => r.json()).then(stats => {
+      document.getElementById('k-nuevos').textContent = stats.nuevos_hoy || 0;
     }), 1000);
   }
 }
 
-// Cargar stats al inicio
-fetch('/api/stats').then(r=>r.json()).then(d=>{
-  document.getElementById('k-nuevos').textContent = d.nuevos_hoy || 0;
+fetch('/api/stats').then(r => r.json()).then((stats) => {
+  document.getElementById('k-nuevos').textContent = stats.nuevos_hoy || 0;
 });
 
-// Verificar si hay scraper corriendo
-fetch('/api/scraper/status').then(r=>r.json()).then(d=>{
-  if(d.running){ setBtns(true); poll(); }
+fetch('/api/scraper/status').then(r => r.json()).then((status) => {
+  if(status.running){
+    setBtns(true);
+    poll();
+  }
 });
 </script>
-</body>
-</html>
+{% endblock %}

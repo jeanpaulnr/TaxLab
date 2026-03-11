@@ -1,0 +1,98 @@
+﻿{% extends 'base.html' %}
+
+{% block title %}Dashboard | TaxLab IA{% endblock %}
+
+{% block top_actions %}
+<a class="btn btn-secondary" href="/app/buscar">Abrir base publica</a>
+<a class="btn btn-primary" href="/app/asistente">Probar asistente</a>
+{% endblock %}
+
+{% block content %}
+<div class="kpi-grid" style="margin-bottom:18px;">
+  <div class="kpi">
+    <div class="kpi-value">{{ '{:,}'.format(total).replace(',', '.') }}</div>
+    <div class="kpi-label">Documentos publicos indexados</div>
+    <div class="kpi-note">Incluye circulares, oficios, resoluciones y judicial.</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-value">{{ por_tipo.get('judicial', 0) }}</div>
+    <div class="kpi-label">Jurisprudencia judicial</div>
+    <div class="kpi-note">Lista para citas, PDF local y filtros.</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-value">{{ total_casos }}</div>
+    <div class="kpi-label">Casos privados</div>
+    <div class="kpi-note">Espacios iniciales por cliente o asunto.</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-value">{{ nuevos_hoy }}</div>
+    <div class="kpi-label">Nuevos hoy</div>
+    <div class="kpi-note">Documentos detectados por la capa de ingestion.</div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1.3fr .9fr;gap:18px;align-items:start;">
+  <section class="card">
+    <div class="card-head">
+      <div class="card-title">Mapa del producto</div>
+    </div>
+    <div class="card-body">
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;">
+        <a href="/app/buscar" class="card" style="text-decoration:none;box-shadow:none;">
+          <div class="card-body">
+            <div class="badge info">Base publica SII</div>
+            <div style="margin-top:12px;font-family:'Crimson Pro',serif;font-size:25px;font-weight:700;">Busqueda documental</div>
+            <p style="margin-top:8px;color:var(--text-soft);line-height:1.7;font-size:14px;">Consulta el corpus completo del SII y jurisprudencia judicial con filtros por tipo, ley, articulo, corte y cuerpo normativo.</p>
+          </div>
+        </a>
+        <a href="/app/asistente" class="card" style="text-decoration:none;box-shadow:none;">
+          <div class="card-body">
+            <div class="badge success">Asistente tributario</div>
+            <div style="margin-top:12px;font-family:'Crimson Pro',serif;font-size:25px;font-weight:700;">Chat con evidencia</div>
+            <p style="margin-top:8px;color:var(--text-soft);line-height:1.7;font-size:14px;">Prepara el endpoint /api/chat y la superficie para respuestas con citas, riesgos y confianza.</p>
+          </div>
+        </a>
+        <a href="/app/casos" class="card" style="text-decoration:none;box-shadow:none;">
+          <div class="card-body">
+            <div class="badge warning">Casos privados</div>
+            <div style="margin-top:12px;font-family:'Crimson Pro',serif;font-size:25px;font-weight:700;">Vaults por cliente</div>
+            <p style="margin-top:8px;color:var(--text-soft);line-height:1.7;font-size:14px;">CRUD minimo de casos, notas y futura vinculacion con consultas IA y documentos guardados.</p>
+          </div>
+        </a>
+        <a href="/app/toolkit" class="card" style="text-decoration:none;box-shadow:none;">
+          <div class="card-body">
+            <div class="badge">Toolkit</div>
+            <div style="margin-top:12px;font-family:'Crimson Pro',serif;font-size:25px;font-weight:700;">Utilidades tributarias</div>
+            <p style="margin-top:8px;color:var(--text-soft);line-height:1.7;font-size:14px;">Estructura inicial para plazos, calendario tributario y tablas historicas.</p>
+          </div>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <div style="display:grid;gap:18px;">
+    <section class="card">
+      <div class="card-head"><div class="card-title">Estado del corpus</div></div>
+      <div class="card-body tight">
+        <div style="display:grid;gap:10px;">
+          <div class="flash-inline">Ultima actualizacion registrada: <strong>{{ ultima_actualizacion or 'Sin registro' }}</strong></div>
+          <div class="flash-inline">Distribucion principal: judicial {{ por_tipo.get('judicial',0) }}, oficio {{ por_tipo.get('oficio',0) }}, resolucion {{ por_tipo.get('resolucion',0) }}, circular {{ por_tipo.get('circular',0) }}.</div>
+          <div class="flash-inline">El panel de scraping sigue operativo y no fue reemplazado. Solo se movio a una navegacion mas clara.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><div class="card-title">Accesos rapidos</div></div>
+      <div class="card-body tight">
+        <div class="inline-actions" style="margin-bottom:10px;">
+          <a class="btn btn-secondary" href="/admin/scraper">Abrir scraping</a>
+          <a class="btn btn-secondary" href="/admin/ingestion">Ver ingestion</a>
+          <a class="btn btn-secondary" href="/agregar">Agregar manual</a>
+        </div>
+        <div class="muted" style="font-size:13px;line-height:1.7;">Sprint 1 busca reordenar la navegacion, preparar RAG y habilitar la primera capa de casos sin tocar los scrapers que ya funcionan.</div>
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock %}

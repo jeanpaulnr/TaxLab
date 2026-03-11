@@ -1,423 +1,432 @@
-﻿<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>SII Normativa · Busqueda Juridica</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;0,700;1,400;1,600&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+﻿{% extends 'base.html' %}
+
+{% block title %}Busqueda | TaxLab IA{% endblock %}
+
+{% block page_styles %}
 <style>
-:root{
-  --bg:#0e0e0e;--surface:#161616;--surface2:#1e1e1e;--surface3:#262626;
-  --ink:#f0ece4;--ink2:#b8b0a4;--muted:#6b6460;--rule:#2a2a2a;
-  --gold:#c8991e;--gold-lt:#e8b83a;--gold-dim:rgba(200,153,30,.15);
-  --circ:#3a7abf;--ofic:#bf7a3a;--reso:#3abf6a;--jud:#7a9fbf;
-  --red:#bf3a3a;--green:#3abf6a;
-}
-*{margin:0;padding:0;box-sizing:border-box}
-html{scroll-behavior:smooth}
-body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;font-size:14px}
-header{background:var(--surface);border-bottom:1px solid var(--rule);display:grid;grid-template-columns:auto 1fr auto;align-items:center;padding:0 1.5rem;height:52px;position:sticky;top:0;z-index:300}
-.logo{display:flex;align-items:center;gap:10px;text-decoration:none}
-.logo-badge{font-family:'DM Mono',monospace;font-size:10px;padding:3px 8px;border:1px solid var(--gold);border-radius:3px;color:var(--gold);letter-spacing:1px}
-.logo-name{font-family:'Crimson Pro',serif;font-size:18px;font-weight:600;color:var(--ink)}
-.hd-center{text-align:center}
-.hd-subtitle{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--muted);text-transform:uppercase}
-.hd-status{display:inline-flex;align-items:center;gap:5px;font-size:10px;color:var(--muted);margin-top:2px}
-.status-dot{width:6px;height:6px;border-radius:50%;background:var(--green)}
-.status-dot.red{background:var(--red)}
-nav{display:flex;gap:2px}
-nav a{padding:5px 12px;border-radius:3px;font-size:12px;font-weight:500;text-decoration:none;color:var(--ink2);transition:all .15s}
-nav a:hover{background:var(--surface3);color:var(--ink)}
-nav a.active{color:var(--gold);background:var(--gold-dim)}
-.layout{display:grid;grid-template-columns:280px 1fr;height:calc(100vh - 52px)}
-aside{background:var(--surface);border-right:1px solid var(--rule);overflow-y:auto;display:flex;flex-direction:column}
-.sb-section{padding:16px;border-bottom:1px solid var(--rule)}
-.sb-label{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:2.5px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;gap:6px}
-.sb-label::after{content:'';flex:1;height:1px;background:var(--rule)}
-.stat-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--rule)}
-.stat-row:last-child{border:none}
-.stat-label{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink2)}
-.sdot{width:7px;height:7px;border-radius:50%}
-.sc{background:var(--circ)}.so{background:var(--ofic)}.sr{background:var(--reso)}.sj{background:var(--jud)}.st{background:var(--gold)}
-.stat-val{font-family:'DM Mono',monospace;font-size:12px;font-weight:500;color:var(--gold)}
-.fg{margin-bottom:10px}
-label{display:block;font-size:10px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
-select,input[type=text]{width:100%;padding:7px 10px;background:var(--surface2);border:1px solid var(--rule);border-radius:3px;font-family:'DM Sans',sans-serif;font-size:12px;color:var(--ink);outline:none;transition:border-color .2s;appearance:none}
-select:focus,input:focus{border-color:var(--gold)}
-select option{background:var(--surface)}
-.art-chip{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;margin:2px;background:var(--surface2);border:1px solid var(--rule);border-radius:100px;font-size:10px;color:var(--ink2);cursor:pointer;transition:all .15s;font-family:'DM Mono',monospace}
-.art-chip:hover{border-color:var(--gold);color:var(--gold-lt)}
-.art-ley{background:var(--surface3);color:var(--muted);padding:1px 4px;border-radius:2px;font-size:8px;letter-spacing:.5px}
-.rec-item{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--rule);cursor:pointer;transition:color .15s}
-.rec-item:last-child{border:none}
-.rec-item:hover .rec-term{color:var(--gold)}
-.rec-term{font-size:12px;color:var(--ink2)}
-.rec-n{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)}
-main{display:flex;flex-direction:column;overflow:hidden}
-.search-bar{background:var(--surface);border-bottom:1px solid var(--rule);padding:16px 20px}
-.search-wrap{position:relative;margin-bottom:10px}
-.search-wrap svg{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none}
-#q{width:100%;padding:11px 13px 11px 42px;background:var(--surface2);border:1.5px solid var(--rule);border-radius:5px;color:var(--ink);font-size:14px;font-family:'DM Sans',sans-serif;outline:none;transition:border-color .2s}
-#q:focus{border-color:var(--gold)}
-#q::placeholder{color:var(--muted)}
-.search-filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.sf{display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--rule);border-radius:3px;padding:5px 9px}
-.sf label{margin:0;font-size:9px;letter-spacing:1.5px;color:var(--gold);white-space:nowrap}
-.sf select{background:transparent;border:none;color:var(--ink);font-size:11px;padding:0;width:auto;cursor:pointer}
-.results-header{display:flex;justify-content:space-between;align-items:center;padding:10px 20px;border-bottom:1px solid var(--rule);background:var(--surface)}
-.rc{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)}
-.rc strong{color:var(--gold);font-size:16px;font-family:'Crimson Pro',serif;font-weight:600}
-.rc-time{font-family:'DM Mono',monospace;font-size:9px;color:var(--rule)}
-.results-scroll{flex:1;overflow-y:auto;padding:14px 20px 40px}
-.card{background:var(--surface);border:1px solid var(--rule);border-radius:5px;margin-bottom:10px;display:grid;grid-template-columns:3px 1fr;overflow:hidden;transition:border-color .2s,box-shadow .2s}
-.card:hover{border-color:#3a3a3a;box-shadow:0 2px 12px rgba(0,0,0,.3)}
-.cs{background:var(--circ)}.cs.so{background:var(--ofic)}.cs.sr{background:var(--reso)}.cs.sj{background:var(--jud)}
-.cb{padding:14px 16px}
-.c-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
-.c-badges{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-.badge{padding:2px 7px;border-radius:2px;font-family:'DM Mono',monospace;font-size:9px;font-weight:500;letter-spacing:.5px;text-transform:uppercase;border:1px solid}
-.bc{color:var(--circ);border-color:rgba(58,122,191,.3);background:rgba(58,122,191,.08)}
-.bo{color:var(--ofic);border-color:rgba(191,122,58,.3);background:rgba(191,122,58,.08)}
-.br{color:var(--reso);border-color:rgba(58,191,106,.3);background:rgba(58,191,106,.08)}
-.bj{color:var(--jud);border-color:rgba(122,159,191,.35);background:rgba(122,159,191,.08)}
-.bl{padding:1px 5px;border-radius:2px;font-family:'DM Mono',monospace;font-size:8px;background:var(--surface3);color:var(--muted)}
-.bl.lir{color:var(--circ);background:rgba(58,122,191,.15)}
-.bl.livs{color:var(--ofic);background:rgba(191,122,58,.15)}
-.bl.ct{color:var(--red);background:rgba(191,58,58,.15)}
-.c-ref{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted)}
-.c-title{font-family:'Crimson Pro',serif;font-size:16px;font-weight:600;line-height:1.3;color:var(--ink);cursor:pointer;margin-bottom:5px}
-.c-title:hover{color:var(--gold)}
-.c-mat{font-size:11px;color:var(--muted);font-style:italic;margin-bottom:6px}
-.j-meta{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:7px}
-.j-chip{padding:2px 7px;background:var(--surface2);border:1px solid var(--rule);border-radius:2px;font-family:'DM Mono',monospace;font-size:9px;color:var(--ink2)}
-.j-chip.soft{color:var(--muted)}
-.c-ext{font-size:12px;color:var(--ink2);line-height:1.65}
-.c-ext mark{background:rgba(200,153,30,.2);color:var(--gold-lt);padding:0 2px;border-radius:1px}
-.c-arts{display:flex;flex-wrap:wrap;gap:3px;margin-top:8px}
-.art-tag{padding:2px 7px;background:var(--surface2);border:1px solid var(--rule);border-radius:2px;font-family:'DM Mono',monospace;font-size:9px;color:var(--muted);cursor:pointer;transition:all .15s}
-.art-tag:hover{border-color:var(--gold);color:var(--gold)}
-.c-foot{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px solid var(--rule)}
-.c-meta{display:flex;align-items:center;gap:4px;font-family:'DM Mono',monospace;font-size:9px;color:var(--muted);margin-left:auto}
-.btn{padding:6px 12px;border-radius:3px;font-size:11px;font-weight:500;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:4px;transition:all .15s;font-family:'DM Sans',sans-serif}
-.btn-gold{background:var(--gold);color:#000}.btn-gold:hover{background:var(--gold-lt)}
-.btn-surface{background:var(--surface2);border:1px solid var(--rule);color:var(--ink2)}.btn-surface:hover{border-color:var(--gold);color:var(--gold)}
-.btn-ghost{background:transparent;border:1px solid var(--rule);color:var(--muted)}.btn-ghost:hover{border-color:var(--muted);color:var(--ink2)}
-.state-box{text-align:center;padding:60px 20px;color:var(--muted)}
-.state-icon{font-size:36px;margin-bottom:14px;opacity:.4}
-.state-title{font-family:'Crimson Pro',serif;font-size:22px;color:var(--ink2);margin-bottom:8px}
-.state-desc{font-size:13px;line-height:1.7;max-width:520px;margin:0 auto}
-.pagination{display:flex;gap:4px;justify-content:center;padding:20px 0}
-.pg{width:32px;height:32px;border-radius:3px;background:var(--surface2);border:1px solid var(--rule);font-size:12px;color:var(--ink2);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;font-family:'DM Mono',monospace}
-.pg:hover{border-color:var(--gold);color:var(--gold)}
-.pg.active{background:var(--gold);color:#000;border-color:var(--gold)}
-.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);z-index:400;align-items:center;justify-content:center;padding:20px}
+.search-shell{display:grid;grid-template-columns:320px minmax(0,1fr);gap:18px;align-items:start}
+.search-panel{display:grid;gap:18px}
+.panel-box{padding:18px;border:1px solid var(--line);border-radius:18px;background:var(--panel)}
+.panel-title{margin-bottom:12px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1.7px;text-transform:uppercase;color:var(--accent)}
+.stat-list{display:grid;gap:9px}
+.stat-row{display:flex;justify-content:space-between;gap:12px;padding-bottom:9px;border-bottom:1px solid var(--line-soft)}
+.stat-row:last-child{border-bottom:none;padding-bottom:0}
+.stat-label{color:var(--text-soft);font-size:13px}
+.stat-value{font-family:'DM Mono',monospace;color:var(--accent);font-size:12px}
+.filter-grid{display:grid;gap:12px}
+.art-chip{display:inline-flex;align-items:center;gap:6px;padding:4px 9px;margin:0 6px 6px 0;border-radius:999px;border:1px solid var(--line);background:var(--panel-2);font-size:11px;color:var(--text-soft);cursor:pointer}
+.art-chip:hover{border-color:rgba(215,163,43,.35);color:var(--accent)}
+.art-ley{font-family:'DM Mono',monospace;font-size:10px;color:var(--accent)}
+.rec-item{display:block;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--panel-2);cursor:pointer;text-decoration:none}
+.rec-item:hover{border-color:rgba(215,163,43,.28)}
+.rec-title{font-size:13px;color:var(--text)}
+.rec-meta{margin-top:5px;font-size:11px;color:var(--muted)}
+.results-shell{display:grid;gap:18px}
+.search-bar{padding:20px;border:1px solid var(--line);border-radius:18px;background:var(--panel)}
+.search-wrap{position:relative}
+.search-input{width:100%;padding:14px 16px 14px 48px;border-radius:16px;border:1px solid var(--line);background:var(--panel-2);color:var(--text);font-size:15px;outline:none}
+.search-input:focus{border-color:rgba(215,163,43,.4)}
+.search-icon{position:absolute;left:16px;top:50%;transform:translateY(-50%);color:var(--muted)}
+.search-filter-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+.search-filter-chip{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:12px;border:1px solid var(--line);background:var(--panel-2)}
+.search-filter-chip label{margin:0;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:var(--accent)}
+.search-filter-chip select{padding:0;border:none;background:transparent;color:var(--text);outline:none}
+.results-head{display:none;align-items:center;justify-content:space-between;gap:12px;padding:18px 20px;border:1px solid var(--line);border-radius:18px;background:var(--panel)}
+.results-count{font-size:14px;color:var(--text-soft)}
+.results-count strong{font-family:'Crimson Pro',serif;font-size:32px;color:var(--accent);line-height:1}
+.results-time{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)}
+.result-card{display:grid;grid-template-columns:4px minmax(0,1fr);border:1px solid var(--line);border-radius:18px;background:var(--panel);overflow:hidden;box-shadow:var(--shadow)}
+.result-card + .result-card{margin-top:12px}
+.result-stripe{background:var(--accent)}
+.result-stripe.circular{background:#5b8fd7}
+.result-stripe.oficio{background:#c27d45}
+.result-stripe.resolucion{background:#4dbb7a}
+.result-stripe.judicial{background:#9caecf}
+.result-body{padding:18px}
+.result-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:10px}
+.result-badges{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.result-ref{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);text-align:right}
+.result-title{font-family:'Crimson Pro',serif;font-size:24px;font-weight:700;line-height:1.16;cursor:pointer}
+.result-title:hover{color:var(--accent)}
+.result-materia{margin-top:6px;color:var(--muted);font-size:13px;font-style:italic}
+.result-meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.meta-chip{padding:5px 9px;border-radius:999px;border:1px solid var(--line);background:var(--panel-2);font-family:'DM Mono',monospace;font-size:10px;color:var(--text-soft)}
+.result-extract{margin-top:14px;color:var(--text-soft);font-size:14px;line-height:1.75}
+.result-extract mark{background:rgba(215,163,43,.2);color:#f2cd73;padding:0 2px;border-radius:2px}
+.result-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px}
+.tag{padding:5px 8px;border-radius:10px;border:1px solid var(--line);background:var(--panel-2);font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);cursor:pointer}
+.tag:hover{border-color:rgba(215,163,43,.28);color:var(--accent)}
+.result-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:16px}
+.result-actions .btn{padding:8px 12px;font-size:12px}
+.result-foot{margin-left:auto;display:flex;align-items:center;gap:8px;color:var(--muted);font-family:'DM Mono',monospace;font-size:10px}
+.pagination{display:flex;gap:8px;justify-content:center;padding-top:14px}
+.pg{min-width:36px;height:36px;padding:0 10px;border-radius:12px;border:1px solid var(--line);background:var(--panel-2);color:var(--text-soft);cursor:pointer}
+.pg.active{background:var(--accent);border-color:var(--accent);color:#111;font-weight:700}
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:22px;z-index:60}
 .modal-bg.open{display:flex}
-.modal{background:var(--surface);border:1px solid var(--rule);border-radius:6px;max-width:640px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.5);overflow:hidden}
-.m-head{background:var(--surface2);border-bottom:1px solid var(--rule);padding:16px 20px;display:flex;justify-content:space-between;align-items:center}
-.m-title{font-family:'Crimson Pro',serif;font-size:18px;font-weight:600}
-.m-close{width:26px;height:26px;background:var(--surface3);border:none;border-radius:3px;color:var(--ink2);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center}
-.m-close:hover{background:var(--rule)}
-.m-body{padding:20px}
-.cita-block{background:var(--surface2);border:1px solid var(--rule);border-radius:3px;padding:12px;margin-bottom:10px}
-.cita-lbl{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:2px;color:var(--gold);text-transform:uppercase;margin-bottom:7px}
-.cita-txt{font-family:'Crimson Pro',serif;font-size:13px;line-height:1.7;color:var(--ink);user-select:all}
-.m-foot{display:flex;gap:6px;justify-content:flex-end;padding:14px 20px;border-top:1px solid var(--rule)}
-.toast{position:fixed;bottom:20px;right:20px;background:var(--green);color:#000;padding:9px 16px;border-radius:3px;font-size:12px;font-weight:600;transform:translateY(50px);opacity:0;transition:all .25s;z-index:500}
-.toast.show{transform:translateY(0);opacity:1}
-.bd{background:var(--red);color:#fff;font-size:8px;padding:2px 6px;border-radius:2px;font-family:'DM Mono',monospace;letter-spacing:.5px}
-@media(max-width:900px){.layout{grid-template-columns:1fr}aside{display:none}}
+.modal{max-width:700px;width:100%;border:1px solid var(--line);border-radius:18px;background:var(--panel);box-shadow:var(--shadow)}
+.modal-head{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:18px 20px;border-bottom:1px solid var(--line)}
+.modal-body{padding:20px}
+.modal-foot{display:flex;gap:10px;justify-content:flex-end;padding:18px 20px;border-top:1px solid var(--line)}
+.cita-block{padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:var(--panel-2)}
+.cita-block + .cita-block{margin-top:10px}
+.cita-label{margin-bottom:6px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:var(--accent)}
+.cita-copy{font-size:14px;line-height:1.7;color:var(--text-soft);user-select:all}
+.toast{position:fixed;bottom:20px;right:20px;padding:10px 14px;border-radius:12px;background:var(--green);color:#111;font-size:12px;font-weight:700;opacity:0;transform:translateY(16px);transition:.18s ease;z-index:80}
+.toast.show{opacity:1;transform:translateY(0)}
+@media (max-width: 1100px){.search-shell{grid-template-columns:1fr}.search-panel{order:2}}
 </style>
-</head>
-<body>
-<header>
-  <a href="/" class="logo">
-    <span class="logo-badge">SII</span>
-    <span class="logo-name">Normativa</span>
-  </a>
-  <div class="hd-center">
-    <div class="hd-subtitle">Sistema de Busqueda Juridica Tributaria</div>
-    <div class="hd-status">
-      <span class="status-dot{% if not ultima_actualizacion %} red{% endif %}"></span>
-      {% if ultima_actualizacion %}Ultima actualizacion: {{ ultima_actualizacion[:16].replace('T',' ') }}{% else %}Sin datos reales - ejecutar scraper{% endif %}
-    </div>
-  </div>
-  <nav>
-    <a href="/" class="active">Busqueda</a>
-    <a href="/scraper">Scraper</a>
-    <a href="/agregar">+ Agregar</a>
-  </nav>
-</header>
+{% endblock %}
 
-<div class="layout">
-  <aside>
-    <div class="sb-section">
-      <div class="sb-label">Base de datos</div>
-      <div class="stat-row"><div class="stat-label"><div class="sdot st"></div>Total</div><div class="stat-val">{{ "{:,}".format(total).replace(",",".") }}</div></div>
-      <div class="stat-row"><div class="stat-label"><div class="sdot sc"></div>Circulares</div><div class="stat-val">{{ por_tipo.get('circular',0) }}</div></div>
-      <div class="stat-row"><div class="stat-label"><div class="sdot so"></div>Oficios</div><div class="stat-val">{{ por_tipo.get('oficio',0) }}</div></div>
-      <div class="stat-row"><div class="stat-label"><div class="sdot sr"></div>Resoluciones</div><div class="stat-val">{{ por_tipo.get('resolucion',0) }}</div></div>
-      <div class="stat-row"><div class="stat-label"><div class="sdot sj"></div>Judicial</div><div class="stat-val">{{ por_tipo.get('judicial',0) }}</div></div>
-    </div>
+{% block top_actions %}
+<span class="badge info">Base publica SII</span>
+<a class="btn btn-secondary" href="/app/asistente">Abrir asistente</a>
+{% endblock %}
 
-    <div class="sb-section">
-      <div class="sb-label">Filtros</div>
-      <div class="fg"><label>Tipo</label>
-        <select id="f-tipo" onchange="buscar(1)">
-          <option value="">Todos</option>
-          <option value="circular">Circular</option>
-          <option value="oficio">Oficio</option>
-          <option value="resolucion">Resolucion</option>
-          <option value="judicial">Jurisprudencia judicial</option>
-        </select>
+{% block content %}
+<div class="search-shell">
+  <aside class="search-panel">
+    <section class="panel-box">
+      <div class="panel-title">Corpus activo</div>
+      <div class="stat-list">
+        <div class="stat-row"><span class="stat-label">Total</span><span class="stat-value">{{ '{:,}'.format(total).replace(',', '.') }}</span></div>
+        <div class="stat-row"><span class="stat-label">Circular</span><span class="stat-value">{{ por_tipo.get('circular',0) }}</span></div>
+        <div class="stat-row"><span class="stat-label">Oficio</span><span class="stat-value">{{ por_tipo.get('oficio',0) }}</span></div>
+        <div class="stat-row"><span class="stat-label">Resolucion</span><span class="stat-value">{{ por_tipo.get('resolucion',0) }}</span></div>
+        <div class="stat-row"><span class="stat-label">Judicial</span><span class="stat-value">{{ por_tipo.get('judicial',0) }}</span></div>
       </div>
-      <div class="fg"><label>Anio</label>
-        <select id="f-anio" onchange="buscar(1)">
-          <option value="">Todos los anios</option>
-          {% for a in range(anio_actual,1989,-1) %}<option value="{{ a }}">{{ a }}</option>{% endfor %}
-        </select>
+    </section>
+
+    <section class="panel-box">
+      <div class="panel-title">Filtros</div>
+      <div class="filter-grid">
+        <div class="field"><label class="label">Tipo</label>
+          <select id="f-tipo" class="select" onchange="buscar(1)">
+            <option value="">Todos</option>
+            <option value="circular">Circular</option>
+            <option value="oficio">Oficio</option>
+            <option value="resolucion">Resolucion</option>
+            <option value="judicial">Jurisprudencia judicial</option>
+          </select>
+        </div>
+        <div class="field"><label class="label">Anio</label>
+          <select id="f-anio" class="select" onchange="buscar(1)">
+            <option value="">Todos</option>
+            {% for a in range(anio_actual,1989,-1) %}
+            <option value="{{ a }}">{{ a }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field"><label class="label">Ley citada</label>
+          <select id="f-ley" class="select" onchange="buscar(1)">
+            <option value="">Todas</option>
+            {% for ley in leyes %}
+            <option value="{{ ley }}">{{ ley }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field"><label class="label">Articulo</label><input id="f-art" class="input" type="text" placeholder="31, 14 D, 200" oninput="debounced()"></div>
+        <div class="field"><label class="label">Materia</label>
+          <select id="f-mat" class="select" onchange="buscar(1)">
+            <option value="">Todas</option>
+            {% for materia in materias %}
+            <option value="{{ materia }}">{{ materia }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field"><label class="label">Corte judicial</label>
+          <select id="f-corte" class="select" onchange="buscar(1)">
+            <option value="">Todas</option>
+            {% for corte in cortes_judiciales %}
+            <option value="{{ corte }}">{{ corte }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field"><label class="label">Cuerpo normativo judicial</label>
+          <select id="f-cuerpo" class="select" onchange="buscar(1)">
+            <option value="">Todos</option>
+            {% for cuerpo in cuerpos_judiciales %}
+            <option value="{{ cuerpo }}">{{ cuerpo }}</option>
+            {% endfor %}
+          </select>
+        </div>
       </div>
-      <div class="fg"><label>Ley citada (sigla)</label>
-        <select id="f-ley" onchange="buscar(1)">
-          <option value="">Todas</option>
-          {% for l in leyes %}<option value="{{ l }}">{{ l }}</option>{% endfor %}
-        </select>
-      </div>
-      <div class="fg"><label>Articulo especifico</label>
-        <input type="text" id="f-art" placeholder="Ej: 31, 14 D, 200" oninput="debounced()">
-      </div>
-      <div class="fg"><label>Materia</label>
-        <select id="f-mat" onchange="buscar(1)">
-          <option value="">Todas</option>
-          {% for m in materias %}<option value="{{ m }}">{{ m }}</option>{% endfor %}
-        </select>
-      </div>
-      <div class="fg"><label>Corte judicial</label>
-        <select id="f-corte" onchange="buscar(1)">
-          <option value="">Todas</option>
-          {% for c in cortes_judiciales %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
-        </select>
-      </div>
-      <div class="fg"><label>Cuerpo normativo judicial</label>
-        <select id="f-cuerpo" onchange="buscar(1)">
-          <option value="">Todos</option>
-          {% for c in cuerpos_judiciales %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
-        </select>
-      </div>
-    </div>
+    </section>
 
     {% if top_arts %}
-    <div class="sb-section">
-      <div class="sb-label">Articulos mas citados</div>
-      {% for a in top_arts %}
-      <span class="art-chip" onclick="filtrarArt('{{ a.ley }}','{{ a.articulo }}')">
-        <span class="art-ley">{{ a.ley }}</span>{{ a.articulo }}
-      </span>
-      {% endfor %}
-    </div>
+    <section class="panel-box">
+      <div class="panel-title">Articulos mas citados</div>
+      <div>
+        {% for art in top_arts %}
+        <span class="art-chip" onclick="filtrarArt('{{ art.ley }}', '{{ art.articulo }}')"><span class="art-ley">{{ art.ley }}</span>{{ art.articulo }}</span>
+        {% endfor %}
+      </div>
+    </section>
     {% endif %}
 
     {% if recientes %}
-    <div class="sb-section">
-      <div class="sb-label">Busquedas recientes</div>
-      {% for r in recientes %}
-      <div class="rec-item" onclick="setQ('{{ r.termino }}')">
-        <span class="rec-term">{{ r.termino }}</span>
-        <span class="rec-n">{{ r.resultados }}</span>
+    <section class="panel-box">
+      <div class="panel-title">Busquedas recientes</div>
+      <div class="filter-grid">
+        {% for r in recientes %}
+        <a class="rec-item" href="#" onclick='setQ({{ r.termino|tojson }}); return false;'>
+          <div class="rec-title">{{ r.termino }}</div>
+          <div class="rec-meta">{{ r.resultados }} resultados</div>
+        </a>
+        {% endfor %}
       </div>
-      {% endfor %}
-    </div>
+    </section>
     {% endif %}
-
-    <div class="sb-section" style="margin-top:auto">
-      <div style="font-family:'DM Mono',monospace;font-size:8px;color:var(--muted);line-height:2">
-        SII Normativa V2.0<br>
-        Fuente: sii.cl (oficial)<br>
-        PDFs -> PyMuPDF -> FTS5<br>
-        Actualizacion: diaria 08:00
-      </div>
-    </div>
   </aside>
 
-  <main>
-    <div class="search-bar">
+  <div class="results-shell">
+    <section class="search-bar">
       <div class="search-wrap">
-        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-        <input id="q" type="text" placeholder="art. 31 LIR gastos necesarios · TTA art. 31 · Corte Suprema codigo tributario · prescripcion 200 CT">
+        <svg class="search-icon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>
+        <input id="q" class="search-input" type="text" placeholder="articulo 31 gastos necesarios · TTA art. 31 · Corte Suprema codigo tributario">
       </div>
-      <div class="search-filters">
-        <div class="sf"><label>VIGENCIA</label>
+      <div class="search-filter-row">
+        <div class="search-filter-chip">
+          <label for="f-vig">Vigencia</label>
           <select id="f-vig" onchange="buscar(1)">
             <option value="">Todas</option>
             <option value="1">Vigentes</option>
             <option value="0">Derogadas</option>
           </select>
         </div>
+        <div class="muted" style="font-size:13px;align-self:center;">Ultima actualizacion: {{ ultima_actualizacion or 'Sin registro' }}</div>
       </div>
-    </div>
+    </section>
 
-    <div class="results-header" id="rh" style="display:none">
-      <div class="rc"><strong id="rc-n">0</strong>&nbsp; resultados</div>
-      <div class="rc-time" id="rc-t"></div>
-    </div>
+    <section class="results-head" id="rh">
+      <div class="results-count"><strong id="rc-n">0</strong> resultados</div>
+      <div class="results-time" id="rc-t"></div>
+    </section>
 
-    <div class="results-scroll">
-      <div id="results">
-        <div class="state-box">
-          <div class="state-icon">⚖</div>
-          <div class="state-title">Busqueda de normativa SII</div>
-          <div class="state-desc">
-            Busca por articulo, materia, ley, corte o cuerpo normativo.<br><br>
-            <strong>Ejemplos:</strong><br>
-            "articulo 31 gastos necesarios" · "Tribunal Tributario y Aduanero Ley sobre Impuesto a la Renta" · "prescripcion 200 CT" · "Corte Suprema codigo tributario"
+    <section class="card">
+      <div class="card-body">
+        <div id="results">
+          <div class="empty-state">
+            <div style="font-size:34px;">Tax</div>
+            <div class="empty-title">Busqueda documental tributaria</div>
+            <div class="empty-copy">Busca por articulo, ley, corte, cuerpo normativo o termino libre. El objetivo de esta pantalla es seguir siendo el acceso mas rapido al corpus publico del SII.</div>
           </div>
         </div>
+        <div id="pag" class="pagination"></div>
       </div>
-      <div id="pag" class="pagination"></div>
-    </div>
-  </main>
+    </section>
+  </div>
 </div>
 
 <div class="modal-bg" id="modal">
   <div class="modal">
-    <div class="m-head">
-      <div class="m-title">Generador de cita formal</div>
-      <button class="m-close" onclick="cerrar()">×</button>
-    </div>
-    <div class="m-body">
-      <div class="cita-block"><div class="cita-lbl">Cita corta</div><div class="cita-txt" id="cc"></div></div>
-      <div class="cita-block"><div class="cita-lbl">Cita media</div><div class="cita-txt" id="cm"></div></div>
-      <div class="cita-block"><div class="cita-lbl">Cita larga</div><div class="cita-txt" id="cl"></div></div>
-      <div class="cita-block"><div class="cita-lbl">Cita para escrito</div><div class="cita-txt" id="ce"></div></div>
-    </div>
-    <div class="m-foot">
+    <div class="modal-head">
+      <div>
+        <div class="card-title" style="margin-bottom:6px;">Generador de cita</div>
+        <div class="muted" style="font-size:13px;">Formatos reutilizables para trabajo profesional.</div>
+      </div>
       <button class="btn btn-ghost" onclick="cerrar()">Cerrar</button>
-      <button class="btn btn-surface" onclick="cp('cc')">Corta</button>
-      <button class="btn btn-surface" onclick="cp('cm')">Media</button>
-      <button class="btn btn-surface" onclick="cp('cl')">Larga</button>
-      <button class="btn btn-gold" onclick="cp('ce')">Escrito</button>
+    </div>
+    <div class="modal-body">
+      <div class="cita-block"><div class="cita-label">Cita corta</div><div class="cita-copy" id="cc"></div></div>
+      <div class="cita-block"><div class="cita-label">Cita media</div><div class="cita-copy" id="cm"></div></div>
+      <div class="cita-block"><div class="cita-label">Cita larga</div><div class="cita-copy" id="cl"></div></div>
+      <div class="cita-block"><div class="cita-label">Cita para escrito</div><div class="cita-copy" id="ce"></div></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="cp('cc')">Corta</button>
+      <button class="btn btn-secondary" onclick="cp('cm')">Media</button>
+      <button class="btn btn-secondary" onclick="cp('cl')">Larga</button>
+      <button class="btn btn-primary" onclick="cp('ce')">Escrito</button>
     </div>
   </div>
 </div>
 
 <div class="toast" id="toast">Copiado</div>
+{% endblock %}
 
+{% block page_scripts %}
 <script>
-let _t, page=1;
-const q = ()=>document.getElementById('q').value.trim();
-const fGet = id => document.getElementById(id)?.value || '';
-const cont = document.getElementById('results');
-const pagEl = document.getElementById('pag');
-const rh = document.getElementById('rh');
+let debounceToken;
+let page = 1;
+const q = () => document.getElementById('q').value.trim();
+const getValue = (id) => document.getElementById(id)?.value || '';
+const resultsEl = document.getElementById('results');
+const paginationEl = document.getElementById('pag');
+const resultsHead = document.getElementById('rh');
 
 document.getElementById('q').addEventListener('input', debounced);
-function debounced(){ clearTimeout(_t); _t = setTimeout(()=>buscar(1), 380); }
-function setQ(t){ document.getElementById('q').value = t; buscar(1); }
-function filtrarArt(ley, art){ document.getElementById('f-ley').value = ley; document.getElementById('f-art').value = art.replace('art. ',''); buscar(1); }
-function filtrarArtTag(art){ document.getElementById('f-art').value = art.replace('art. ',''); buscar(1); }
+
+function debounced(){
+  clearTimeout(debounceToken);
+  debounceToken = setTimeout(() => buscar(1), 360);
+}
+
+function setQ(texto){
+  document.getElementById('q').value = texto;
+  buscar(1);
+}
+
+function filtrarArt(ley, articulo){
+  document.getElementById('f-ley').value = ley;
+  document.getElementById('f-art').value = String(articulo).replace('art. ', '');
+  buscar(1);
+}
+
+function filtrarArtTag(articulo){
+  document.getElementById('f-art').value = String(articulo).replace('art. ', '');
+  buscar(1);
+}
+
+function emptyState(title, copy, icon){
+  return `<div class="empty-state"><div style="font-size:34px;">${icon}</div><div class="empty-title">${title}</div><div class="empty-copy">${copy}</div></div>`;
+}
+
+function applyParamsFromUrl(){
+  const params = new URLSearchParams(window.location.search);
+  const mapping = {
+    q: 'q',
+    tipo: 'f-tipo',
+    anio: 'f-anio',
+    ley: 'f-ley',
+    articulo: 'f-art',
+    materia: 'f-mat',
+    corte: 'f-corte',
+    cuerpo: 'f-cuerpo',
+    vigente: 'f-vig'
+  };
+  Object.entries(mapping).forEach(([param, fieldId]) => {
+    const value = params.get(param);
+    if(value !== null && document.getElementById(fieldId)){
+      document.getElementById(fieldId).value = value;
+    }
+  });
+  const hasAny = [...params.keys()].length > 0;
+  if(hasAny){
+    buscar(Number(params.get('page') || '1'));
+  }
+}
 
 async function buscar(p=1){
   page = p;
-  const qq = q();
-  const tipo = fGet('f-tipo');
-  const anio = fGet('f-anio');
-  const ley = fGet('f-ley');
-  const art = fGet('f-art');
-  const mat = fGet('f-mat');
-  const vig = fGet('f-vig');
-  const corte = fGet('f-corte');
-  const cuerpo = fGet('f-cuerpo');
-
-  if(!qq && !tipo && !anio && !ley && !art && !mat && !vig && !corte && !cuerpo){
-    cont.innerHTML = `<div class="state-box"><div class="state-icon">⚖</div><div class="state-title">Ingresa un termino o aplica un filtro</div></div>`;
-    rh.style.display = 'none';
-    pagEl.innerHTML = '';
+  const payload = {
+    q: q(),
+    tipo: getValue('f-tipo'),
+    anio: getValue('f-anio'),
+    ley: getValue('f-ley'),
+    materia: getValue('f-mat'),
+    articulo: getValue('f-art'),
+    vigente: getValue('f-vig'),
+    corte: getValue('f-corte'),
+    cuerpo: getValue('f-cuerpo'),
+    page: String(p)
+  };
+  const hasFilters = Object.entries(payload).some(([key, value]) => key !== 'page' && value);
+  if(!hasFilters){
+    resultsEl.innerHTML = emptyState('Ingresa un termino o aplica filtros', 'Puedes partir con una ley, un articulo, un tribunal o una materia tributaria.', 'Tax');
+    resultsHead.style.display = 'none';
+    paginationEl.innerHTML = '';
+    history.replaceState({}, '', '/app/buscar');
     return;
   }
 
-  cont.innerHTML = `<div class="state-box"><div class="state-icon" style="animation:spin 1s linear infinite;display:inline-block">⟳</div><div class="state-title">Buscando...</div></div>`;
+  resultsEl.innerHTML = emptyState('Buscando en el corpus', 'Se esta consultando FTS5 y metadata estructurada del corpus tributario.', '...');
+  const started = Date.now();
+  const search = new URLSearchParams(payload);
+  const response = await fetch('/buscar?' + search.toString());
+  const data = await response.json();
+  const elapsed = Date.now() - started;
 
-  const t0 = Date.now();
-  const ps = new URLSearchParams({q:qq,tipo,anio,ley,materia:mat,articulo:art,vigente:vig,corte,cuerpo,page:p});
-  const d = await (await fetch('/buscar?' + ps)).json();
-  const ms = Date.now() - t0;
+  history.replaceState({}, '', '/app/buscar?' + search.toString());
 
-  rh.style.display = 'flex';
-  document.getElementById('rc-n').textContent = d.total.toLocaleString('es-CL');
-  document.getElementById('rc-t').textContent = ms + 'ms';
+  resultsHead.style.display = 'flex';
+  document.getElementById('rc-n').textContent = Number(data.total || 0).toLocaleString('es-CL');
+  document.getElementById('rc-t').textContent = elapsed + ' ms';
 
-  if(!d.resultados.length){
-    cont.innerHTML = `<div class="state-box"><div class="state-icon">⌕</div><div class="state-title">Sin resultados</div><div class="state-desc">Prueba con un termino mas general o combina filtros judiciales.</div></div>`;
-    pagEl.innerHTML = '';
+  if(!data.resultados || !data.resultados.length){
+    resultsEl.innerHTML = emptyState('Sin resultados', 'Prueba con un termino mas general o combina filtros judiciales y administrativos.', '0');
+    paginationEl.innerHTML = '';
     return;
   }
 
-  cont.innerHTML = d.resultados.map(r => {
-    const leyes = (r.leyes || []).map(l => `<span class="bl ${l.toLowerCase()}">${l}</span>`).join('');
-    const arts = (r.articulos || []).map(a => `<span class="art-tag" onclick="filtrarArtTag('${a.replace(/'/g, "\\'")}')">${a}</span>`).join('');
-    const tipoCls = {circular:'bc', oficio:'bo', resolucion:'br', judicial:'bj'}[r.tipo] || 'bc';
-    const stripeCls = {circular:'cs', oficio:'cs so', resolucion:'cs sr', judicial:'cs sj'}[r.tipo] || 'cs';
-    const derogada = r.vigente === 0 ? '<span class="bd">DEROGADA</span>' : '';
-    const cuerpos = (r.cuerpos_normativos || []).slice(0, 3).map(c => `<span class="j-chip">${c}</span>`).join('');
+  resultsEl.innerHTML = data.resultados.map((r) => {
+    const leyes = (r.leyes || []).map((ley) => `<span class="badge">${ley}</span>`).join('');
+    const articulos = (r.articulos || []).map((art) => `<span class="tag" onclick="filtrarArtTag('${String(art).replaceAll("'", "\\'")}')">${art}</span>`).join('');
+    const cuerpos = (r.cuerpos_normativos || []).slice(0, 3).map((cuerpo) => `<span class="meta-chip">${cuerpo}</span>`).join('');
     const judicialMeta = r.tipo === 'judicial'
-      ? `<div class="j-meta">${r.corte ? `<span class="j-chip">${r.corte}</span>` : ''}${r.tribunal ? `<span class="j-chip soft">${r.tribunal}</span>` : ''}${cuerpos}</div>`
+      ? `<div class="result-meta">${r.corte ? `<span class="meta-chip">${r.corte}</span>` : ''}${r.tribunal ? `<span class="meta-chip">${r.tribunal}</span>` : ''}${cuerpos}</div>`
       : '';
-    const meta = r.paginas ? `<span class="c-meta">PDF ${r.paginas} pags.</span>` : '';
-    return `<div class="card">
-      <div class="${stripeCls}"></div>
-      <div class="cb">
-        <div class="c-top">
-          <div class="c-badges"><span class="badge ${tipoCls}">${r.tipo}</span>${leyes}${derogada}</div>
-          <span class="c-ref">${r.referencia || ''}</span>
+    const vigente = Number(r.vigente) === 0 ? '<span class="badge danger">Derogada</span>' : '';
+    return `
+      <article class="result-card">
+        <div class="result-stripe ${r.tipo}"></div>
+        <div class="result-body">
+          <div class="result-top">
+            <div>
+              <div class="result-badges"><span class="badge info">${r.tipo}</span>${leyes}${vigente}</div>
+            </div>
+            <div class="result-ref">${r.referencia || ''}</div>
+          </div>
+          <div class="result-title" onclick="location.href='/app/documento/${r.id}'">${r.titulo}</div>
+          ${r.materia ? `<div class="result-materia">${r.materia}</div>` : ''}
+          ${judicialMeta}
+          <div class="result-extract">${r.extracto || ''}</div>
+          ${articulos ? `<div class="result-tags">${articulos}</div>` : ''}
+          <div class="result-actions">
+            <button class="btn btn-primary" onclick="cita(${r.id})">Citar</button>
+            <a class="btn btn-secondary" href="/app/documento/${r.id}">Ver detalle</a>
+            ${r.pdf_url ? `<button class="btn btn-secondary" onclick="window.open('${r.pdf_url}', '_blank')">PDF local</button>` : ''}
+            ${r.url_sii ? `<button class="btn btn-ghost" onclick="window.open('${r.url_sii}', '_blank')">SII.cl</button>` : ''}
+            <div class="result-foot">${r.paginas ? `PDF ${r.paginas} pags.` : ''}</div>
+          </div>
         </div>
-        <div class="c-title" onclick="location.href='/documento/${r.id}'">${r.titulo}</div>
-        ${r.materia ? `<div class="c-mat">${r.materia}</div>` : ''}
-        ${judicialMeta}
-        <div class="c-ext">${r.extracto}</div>
-        ${arts ? `<div class="c-arts">${arts}</div>` : ''}
-        <div class="c-foot">
-          <button class="btn btn-gold" onclick="cita(${r.id})">Citar</button>
-          <button class="btn btn-surface" onclick="location.href='/documento/${r.id}'">Ver completo</button>
-          ${r.pdf_url ? `<button class="btn btn-surface" onclick="window.open('${r.pdf_url}','_blank')">PDF local</button>` : ''}
-          ${r.url_sii ? `<button class="btn btn-ghost" onclick="window.open('${r.url_sii}','_blank')">SII.cl</button>` : ''}
-          ${meta}
-        </div>
-      </div>
-    </div>`;
+      </article>
+    `;
   }).join('');
 
-  if(d.paginas > 1){
-    const bs = [];
-    if(p > 1) bs.push(`<button class="pg" onclick="buscar(${p-1})">‹</button>`);
-    for(let i = Math.max(1, p - 2); i <= Math.min(d.paginas, p + 2); i++){
-      bs.push(`<button class="pg ${i===p?'active':''}" onclick="buscar(${i})">${i}</button>`);
+  if(Number(data.paginas) > 1){
+    const buttons = [];
+    if(p > 1){ buttons.push(`<button class="pg" onclick="buscar(${p - 1})">Anterior</button>`); }
+    for(let i = Math.max(1, p - 2); i <= Math.min(data.paginas, p + 2); i++){
+      buttons.push(`<button class="pg ${i === p ? 'active' : ''}" onclick="buscar(${i})">${i}</button>`);
     }
-    if(p < d.paginas) bs.push(`<button class="pg" onclick="buscar(${p+1})">›</button>`);
-    pagEl.innerHTML = bs.join('');
+    if(p < data.paginas){ buttons.push(`<button class="pg" onclick="buscar(${p + 1})">Siguiente</button>`); }
+    paginationEl.innerHTML = buttons.join('');
   } else {
-    pagEl.innerHTML = '';
+    paginationEl.innerHTML = '';
   }
 }
 
 async function cita(id){
-  const d = await (await fetch('/api/cita/' + id)).json();
-  document.getElementById('cc').textContent = d.cita_corta;
-  document.getElementById('cm').textContent = d.cita_media;
-  document.getElementById('cl').textContent = d.cita_larga;
-  document.getElementById('ce').textContent = d.cita_escrito;
+  const response = await fetch('/api/cita/' + id);
+  const data = await response.json();
+  document.getElementById('cc').textContent = data.cita_corta || '';
+  document.getElementById('cm').textContent = data.cita_media || '';
+  document.getElementById('cl').textContent = data.cita_larga || '';
+  document.getElementById('ce').textContent = data.cita_escrito || data.cita_larga || '';
   document.getElementById('modal').classList.add('open');
 }
-function cerrar(){ document.getElementById('modal').classList.remove('open'); }
+
+function cerrar(){
+  document.getElementById('modal').classList.remove('open');
+}
+
 function cp(id){
-  navigator.clipboard.writeText(document.getElementById(id).textContent.trim()).then(()=>{
-    const t = document.getElementById('toast');
-    t.classList.add('show');
-    setTimeout(()=>t.classList.remove('show'), 2000);
+  navigator.clipboard.writeText(document.getElementById(id).textContent.trim()).then(() => {
+    const toast = document.getElementById('toast');
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2000);
   });
 }
-document.getElementById('modal').addEventListener('click', e => { if(e.target === e.currentTarget) cerrar(); });
-document.addEventListener('keydown', e => { if(e.key === 'Escape') cerrar(); });
+
+document.getElementById('modal').addEventListener('click', (event) => {
+  if(event.target === event.currentTarget){ cerrar(); }
+});
+
+document.addEventListener('keydown', (event) => {
+  if(event.key === 'Escape'){ cerrar(); }
+});
+
+applyParamsFromUrl();
 </script>
-<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
-</body>
-</html>
+{% endblock %}

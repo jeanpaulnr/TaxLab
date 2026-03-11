@@ -1,0 +1,325 @@
+﻿{% extends 'base.html' %}
+
+{% block title %}Asistente | TaxLab IA{% endblock %}
+
+{% block page_styles %}
+<style>
+.assistant-shell{display:grid;grid-template-columns:320px minmax(0,1fr);gap:18px;align-items:start}
+.panel-stack{display:grid;gap:18px}
+.history-list{display:grid;gap:10px}
+.history-item{
+  padding:12px 14px;
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:var(--panel-2);
+  cursor:pointer;
+  transition:.16s ease;
+}
+.history-item:hover{border-color:rgba(215,163,43,.28)}
+.history-q{font-size:13px;font-weight:600;color:var(--text)}
+.history-meta{margin-top:6px;font-size:11px;color:var(--muted)}
+.answer-grid{display:grid;gap:14px}
+.answer-card{
+  padding:16px;
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:var(--panel-2);
+}
+.answer-title{
+  margin-bottom:8px;
+  font-family:'DM Mono',monospace;
+  font-size:10px;
+  letter-spacing:1.5px;
+  text-transform:uppercase;
+  color:var(--accent);
+}
+.answer-copy{font-size:14px;line-height:1.8;color:var(--text-soft)}
+.source-list{display:grid;gap:10px}
+.source-item{
+  padding:12px 14px;
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:rgba(255,255,255,.015);
+}
+.source-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.source-ref{font-weight:700;font-size:14px}
+.source-meta{font-size:11px;color:var(--muted)}
+.source-ext{margin-top:8px;color:var(--text-soft);font-size:13px;line-height:1.7}
+.helper-row{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+@media (max-width: 980px){.assistant-shell{grid-template-columns:1fr}}
+</style>
+{% endblock %}
+
+{% block top_actions %}
+<span class="badge info">Modo evidencia</span>
+<a class="btn btn-secondary" href="/app/buscar">Ir a busqueda</a>
+{% endblock %}
+
+{% block content %}
+<div class="assistant-shell">
+  <div class="panel-stack">
+    <section class="card">
+      <div class="card-head"><div class="card-title">Historial local</div></div>
+      <div class="card-body tight">
+        <div id="history" class="history-list">
+          <div class="flash-inline">Todavia no hay consultas en este navegador. Las siguientes respuestas se iran guardando localmente para esta interfaz.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><div class="card-title">Reglas del asistente</div></div>
+      <div class="card-body tight">
+        <div class="flash-inline">1. No inventa. 2. Cita tipo, numero, anio y extracto. 3. Separa norma, criterio SII y judicial cuando haya base. 4. Si falta evidencia, lo dice.</div>
+      </div>
+    </section>
+  </div>
+
+  <div class="panel-stack">
+    <section class="card">
+      <div class="card-head"><div class="card-title">Pregunta tributaria</div></div>
+      <div class="card-body">
+        <div class="field" style="margin-bottom:14px;">
+          <label class="label">Consulta</label>
+          <textarea id="pregunta" class="textarea" style="min-height:180px;" placeholder="Ejemplo: Puede rechazarse gasto necesario por falta de acreditacion suficiente en una agencia en el extranjero segun art. 31 LIR?"></textarea>
+        </div>
+        <div class="field-grid" style="margin-bottom:14px;">
+          <div class="field">
+            <label class="label">Tipo de documento</label>
+            <select id="filtro-tipo" class="select">
+              <option value="">Todos</option>
+              <option value="circular">Circular</option>
+              <option value="oficio">Oficio</option>
+              <option value="resolucion">Resolucion</option>
+              <option value="judicial">Judicial</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="label">Anio</label>
+            <select id="filtro-anio" class="select">
+              <option value="">Todos</option>
+              {% for a in range(anio_actual, 1989, -1) %}
+              <option value="{{ a }}">{{ a }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="field">
+            <label class="label">Ley</label>
+            <select id="filtro-ley" class="select">
+              <option value="">Todas</option>
+              {% for ley in leyes %}
+              <option value="{{ ley }}">{{ ley }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="field">
+            <label class="label">Caso para guardar</label>
+            <select id="caso-destino" class="select">
+              <option value="">Sin guardar</option>
+              {% for caso in casos %}
+              <option value="{{ caso.id }}">{{ caso.nombre }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="helper-row">
+          <button class="btn btn-primary" id="btn-consultar" onclick="enviarConsulta()">Consultar con evidencia</button>
+          <span class="muted" id="status-api">Si ANTHROPIC_API_KEY no esta configurada, igual se devolvera contexto y fuentes.</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" id="resultado-card">
+      <div class="card-head">
+        <div class="card-title">Respuesta</div>
+        <div class="inline-actions" id="resultado-actions" style="display:none;">
+          <span class="badge" id="badge-confianza">Sin ejecutar</span>
+          <button class="btn btn-secondary" id="guardar-consulta" onclick="guardarConsulta()">Guardar en caso</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div id="resultado-vacio" class="empty-state">
+          <div style="font-size:30px;">AI</div>
+          <div class="empty-title">Asistente listo para evidencia</div>
+          <div class="empty-copy">Esta pantalla ya queda preparada para RAG. El endpoint buscara en FTS5, traera fragmentos relevantes y respondera solo con base en el corpus disponible.</div>
+        </div>
+        <div id="resultado-contenido" style="display:none;" class="answer-grid">
+          <div class="answer-card">
+            <div class="answer-title">Conclusion breve</div>
+            <div class="answer-copy" id="respuesta"></div>
+          </div>
+          <div class="answer-card">
+            <div class="answer-title">Fundamento</div>
+            <div class="answer-copy" id="fundamento"></div>
+          </div>
+          <div class="answer-card">
+            <div class="answer-title">Riesgos o contraargumentos</div>
+            <div class="answer-copy" id="riesgos"></div>
+          </div>
+          <div class="answer-card">
+            <div class="answer-title">Nota operativa</div>
+            <div class="answer-copy" id="nota"></div>
+          </div>
+          <div class="answer-card">
+            <div class="answer-title">Fuentes citadas</div>
+            <div id="fuentes" class="source-list"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock %}
+
+{% block page_scripts %}
+<script>
+const HISTORY_KEY = 'taxlab_chat_history_v1';
+let lastResponse = null;
+
+function renderHistory(){
+  const wrap = document.getElementById('history');
+  const items = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+  if(!items.length){
+    wrap.innerHTML = '<div class="flash-inline">Todavia no hay consultas en este navegador. Las siguientes respuestas se iran guardando localmente para esta interfaz.</div>';
+    return;
+  }
+  wrap.innerHTML = items.map((item, index) => `
+    <div class="history-item" onclick="cargarHistory(${index})">
+      <div class="history-q">${escapeHtml(item.pregunta)}</div>
+      <div class="history-meta">${escapeHtml(item.fecha)} · ${escapeHtml(item.confianza || 'sin confianza')}</div>
+    </div>
+  `).join('');
+}
+
+function cargarHistory(index){
+  const items = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+  if(!items[index]) return;
+  document.getElementById('pregunta').value = items[index].pregunta;
+  hydrateResult(items[index].respuesta);
+}
+
+function persistHistory(pregunta, response){
+  const items = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+  items.unshift({pregunta, respuesta: response, confianza: response.confianza, fecha: new Date().toLocaleString('es-CL')});
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(items.slice(0, 10)));
+  renderHistory();
+}
+
+function escapeHtml(value){
+  return String(value || '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;');
+}
+
+function confidenceBadge(confianza){
+  const value = String(confianza || 'baja').toLowerCase();
+  if(value === 'alta') return ['ALTA', 'success'];
+  if(value === 'media') return ['MEDIA', 'warning'];
+  return ['BAJA', 'danger'];
+}
+
+function hydrateResult(data){
+  lastResponse = data;
+  document.getElementById('resultado-vacio').style.display = 'none';
+  document.getElementById('resultado-contenido').style.display = 'grid';
+  document.getElementById('resultado-actions').style.display = 'flex';
+  document.getElementById('respuesta').textContent = data.respuesta || 'Sin respuesta.';
+  document.getElementById('fundamento').textContent = data.fundamento || 'Sin fundamento adicional.';
+  document.getElementById('riesgos').textContent = data.riesgos || 'Sin riesgos adicionales.';
+  document.getElementById('nota').textContent = data.nota || 'Sin nota.';
+  const badge = document.getElementById('badge-confianza');
+  const [label, cls] = confidenceBadge(data.confianza);
+  badge.className = 'badge ' + cls;
+  badge.textContent = 'Confianza ' + label;
+  const fuentes = data.fuentes || [];
+  document.getElementById('fuentes').innerHTML = fuentes.length ? fuentes.map((fuente) => `
+    <div class="source-item">
+      <div class="source-head">
+        <div>
+          <div class="source-ref">${escapeHtml(fuente.referencia || ('Documento ' + fuente.id))}</div>
+          <div class="source-meta">${escapeHtml(fuente.tipo || '')} · relevancia ${escapeHtml(fuente.relevancia || '')}</div>
+        </div>
+        <a class="btn btn-secondary" href="/app/documento/${fuente.id}">Abrir documento</a>
+      </div>
+      <div class="source-ext">${escapeHtml(fuente.extracto || '')}</div>
+    </div>
+  `).join('') : '<div class="flash-inline">No se devolvieron fuentes.</div>';
+}
+
+async function enviarConsulta(){
+  const pregunta = document.getElementById('pregunta').value.trim();
+  if(!pregunta){
+    alert('Ingresa una pregunta para consultar el corpus.');
+    return;
+  }
+  const btn = document.getElementById('btn-consultar');
+  btn.disabled = true;
+  btn.textContent = 'Consultando...';
+  document.getElementById('status-api').textContent = 'Buscando contexto y generando respuesta...';
+  try {
+    const payload = {
+      pregunta,
+      filtros: {
+        tipo: document.getElementById('filtro-tipo').value,
+        anio: document.getElementById('filtro-anio').value,
+        ley: document.getElementById('filtro-ley').value,
+      }
+    };
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json();
+    if(!response.ok){
+      throw new Error(data.error || 'No se pudo procesar la consulta.');
+    }
+    hydrateResult(data);
+    persistHistory(pregunta, data);
+    document.getElementById('status-api').textContent = data.nota || 'Respuesta generada con fuentes del corpus.';
+  } catch (error) {
+    document.getElementById('status-api').textContent = error.message;
+    alert(error.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Consultar con evidencia';
+  }
+}
+
+async function guardarConsulta(){
+  const casoId = document.getElementById('caso-destino').value;
+  const pregunta = document.getElementById('pregunta').value.trim();
+  if(!casoId){
+    alert('Selecciona un caso destino primero.');
+    return;
+  }
+  if(!lastResponse){
+    alert('Todavia no hay una respuesta para guardar.');
+    return;
+  }
+  const response = await fetch(`/api/casos/${casoId}/guardar-consulta`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      pregunta,
+      respuesta: lastResponse.respuesta,
+      fundamento: lastResponse.fundamento,
+      riesgos: lastResponse.riesgos,
+      confianza: lastResponse.confianza,
+      nota: lastResponse.nota,
+      fuentes: lastResponse.fuentes || []
+    })
+  });
+  const data = await response.json();
+  if(!response.ok || !data.ok){
+    alert(data.error || 'No se pudo guardar la consulta.');
+    return;
+  }
+  alert('Consulta guardada en el caso.');
+}
+
+renderHistory();
+</script>
+{% endblock %}

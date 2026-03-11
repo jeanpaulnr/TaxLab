@@ -1,0 +1,49 @@
+﻿{% extends 'base.html' %}
+
+{% block title %}Ingestion | TaxLab IA{% endblock %}
+
+{% block top_actions %}
+<a class="btn btn-secondary" href="/admin/scraper">Abrir panel de scraping</a>
+{% endblock %}
+
+{% block content %}
+<div style="display:grid;grid-template-columns:1.1fr .9fr;gap:18px;align-items:start;">
+  <section class="card">
+    <div class="card-head"><div class="card-title">Panel de ingestion general</div></div>
+    <div class="card-body">
+      <div class="badge info">Stub inicial</div>
+      <div style="margin-top:12px;font-family:'Crimson Pro',serif;font-size:32px;font-weight:700;line-height:1.08;">Fuentes, QA y futuras canalizaciones</div>
+      <p style="margin-top:12px;color:var(--text-soft);line-height:1.8;font-size:14px;">Este modulo se reserva para mostrar la salud del corpus, conectores nuevos y flujos de enriquecimiento posterior. En Sprint 1 queda como capa de navegacion y documentacion operativa.</p>
+      <div style="display:grid;gap:12px;margin-top:18px;">
+        <div class="flash-inline">Fuente estable actual: scrapers SII y judicial ya funcionales.</div>
+        <div class="flash-inline">Siguiente paso natural: checks de completitud, enriquecimiento de metadata y colas de ingestion para Fase B.</div>
+      </div>
+    </div>
+  </section>
+
+  <div style="display:grid;gap:18px;">
+    <section class="card">
+      <div class="card-head"><div class="card-title">Fuentes actuales</div></div>
+      <div class="card-body tight">
+        <ul class="list-clean" style="display:grid;gap:10px;">
+          <li class="flash-inline">Circulares SII</li>
+          <li class="flash-inline">Oficios SII via API</li>
+          <li class="flash-inline">Resoluciones via URL directa</li>
+          <li class="flash-inline">Jurisprudencia judicial SII con PDF local</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><div class="card-title">TODOs de ingestion</div></div>
+      <div class="card-body tight">
+        <ul class="list-clean" style="display:grid;gap:10px;">
+          <li class="flash-inline">Agregar chequeos de completitud por fuente y anio.</li>
+          <li class="flash-inline">Preparar enriquecimiento IA para criterio principal y tema central.</li>
+          <li class="flash-inline">Diseñar colas y storage desacoplado para Fase B.</li>
+        </ul>
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock %}
