@@ -15,11 +15,12 @@ Oficios (IVA, LIR, Otras Normas):
      Campos: nombreDocumento, extension, acc, id, mediaType
 """
 
-import os, sys, time, json, hashlib, re, logging
+import os, sys, time, json, hashlib, re, logging, textwrap
 import sqlite3
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime, date
+from urllib.parse import urljoin
 import fitz  # PyMuPDF
 
 BASE    = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -62,12 +63,48 @@ PDF_URLS = {
     'resolucion': f"{SII_BASE}/resoluciones/{{anio}}/reso{{num}}.pdf",
 }
 
+LEGACY_CIRCULARES_BASE = "https://www.sii.cl/documentos/circulares"
+
+def obtener_urls_indice(tipo_clave, anio):
+    if tipo_clave == 'circular' and anio <= 2012:
+        return [
+            f"{LEGACY_CIRCULARES_BASE}/{anio}/indcir{anio}.htm",
+            INDICES[tipo_clave].format(anio=anio),
+        ]
+    return [INDICES[tipo_clave].format(anio=anio)]
+
+def obtener_urls_pdf(tipo_clave, anio, numero):
+    if tipo_clave == 'circular' and anio <= 2012:
+        return [
+            f"{LEGACY_CIRCULARES_BASE}/{anio}/circu{numero}.pdf",
+            PDF_URLS[tipo_clave].format(anio=anio, num=numero),
+        ]
+    return [PDF_URLS[tipo_clave].format(anio=anio, num=numero)]
+
+
 # Claves verificadas en el HTML fuente del portal SII
 OFICIO_API_KEYS = {
     'oficio_iva':   'IVA',    # Ley Impuesto Ventas y Servicios
     'oficio_lir':   'RENTA',  # Ley Impuesto a la Renta
     'oficio_otras': 'OTRAS',  # Otras Normas (CT, Timbres, Herencias...)
 }
+
+MESES = {
+    'enero': '01',
+    'febrero': '02',
+    'marzo': '03',
+    'abril': '04',
+    'mayo': '05',
+    'junio': '06',
+    'julio': '07',
+    'agosto': '08',
+    'septiembre': '09',
+    'setiembre': '09',
+    'octubre': '10',
+    'noviembre': '11',
+    'diciembre': '12',
+}
+
 
 # ── DB ────────────────────────────────────────────────────────────────────
 def get_db():
@@ -100,6 +137,106 @@ def extraer_texto_pdf(pdf_bytes):
         return {'texto': texto, 'paginas': len(doc), 'chars': len(texto), 'ok': True}
     except Exception as e:
         return {'texto': '', 'paginas': 0, 'chars': 0, 'ok': False, 'error': str(e)}
+
+def _soup_a_texto_legible(soup):
+    soup = BeautifulSoup(str(soup), 'html.parser')
+
+    for tag in soup(['script', 'style', 'noscript']):
+        tag.decompose()
+
+    for br in soup.find_all('br'):
+        br.replace_with('\n')
+
+    for table in soup.find_all('table'):
+        filas = []
+        for tr in table.find_all('tr'):
+            celdas = [
+                re.sub(r'\s+', ' ', td.get_text(' ', strip=True)).strip()
+                for td in tr.find_all(['th', 'td'])
+            ]
+            celdas = [c for c in celdas if c]
+            if celdas:
+                filas.append(' | '.join(celdas))
+        bloque = '\n'.join(filas).strip()
+        table.replace_with(f"\n{bloque}\n" if bloque else '\n')
+
+    texto = soup.get_text('\n', strip=True)
+    texto = re.sub(r'\n{3,}', '\n\n', texto)
+
+    inicio = re.search(r'circular\s*n', texto, re.IGNORECASE)
+    if inicio:
+        texto = texto[inicio.start():]
+
+    return texto.strip()
+
+def _generar_pdf_desde_texto(titulo, texto):
+    contenido = (f"{titulo}\n\n{texto}" if titulo else texto).strip()
+    if not contenido:
+        return None
+
+    doc = fitz.open()
+    rect = fitz.paper_rect('a4')
+    margen_x = 42
+    margen_y = 48
+    line_height = 14
+    max_width = 95
+
+    lineas = []
+    for bloque in contenido.splitlines():
+        bloque = bloque.rstrip()
+        if not bloque:
+            lineas.append('')
+            continue
+        partes = textwrap.wrap(
+            bloque,
+            width=max_width,
+            replace_whitespace=False,
+            drop_whitespace=False,
+        ) or ['']
+        lineas.extend([p.rstrip() for p in partes])
+
+    pagina = None
+    y = rect.height
+    for linea in lineas:
+        if pagina is None or y + line_height > rect.height - margen_y:
+            pagina = doc.new_page(width=rect.width, height=rect.height)
+            y = margen_y
+        pagina.insert_text((margen_x, y), linea, fontsize=10.5, fontname='helv')
+        y += line_height
+
+    return doc.tobytes()
+
+def _descargar_circular_html(url_detalle, anio, doc_info):
+    try:
+        r = SESSION.get(url_detalle, timeout=20)
+        if r.status_code != 200:
+            return None
+        r.encoding = 'utf-8'
+        soup = BeautifulSoup(r.text, 'html.parser')
+        texto = _soup_a_texto_legible(soup)
+        if len(texto) < 80:
+            return None
+
+        titulo = (doc_info.get('titulo') or '').strip()
+        if not titulo:
+            primera = next((linea.strip() for linea in texto.splitlines() if linea.strip()), '')
+            titulo = primera[:500]
+
+        fecha = _extraer_fecha_circular(texto, anio)
+        descripcion = doc_info.get('descripcion') or extraer_resumen(texto, max_chars=300)
+        pdf_bytes = _generar_pdf_desde_texto(titulo, texto)
+        if not pdf_bytes:
+            return None
+
+        return {
+            'pdf_bytes': pdf_bytes,
+            'titulo': titulo,
+            'descripcion': descripcion,
+            'fecha': fecha,
+        }
+    except Exception as e:
+        log.warning(f"  No se pudo convertir HTML a PDF para {url_detalle}: {e}")
+        return None
 
 # ── Análisis ──────────────────────────────────────────────────────────────
 LEYES_MAP = {
@@ -187,27 +324,163 @@ def log_scraper(tipo, anio, numero, estado, url):
     finally: conn.close()
 
 # ── Parseo índices HTML ───────────────────────────────────────────────────
-def parsear_indice_circulares(html, anio):
+def _limpiar_texto_html(texto):
+    return re.sub(r'\s+', ' ', (texto or '')).strip()
+
+def _extraer_numero_circular(titulo, href=''):
+    fuentes = [titulo or '', href or '']
+    patrones = [
+        r'circular\s*n(?:\D{0,2})\s*0*(\d+)',
+        r'circu(?:lar)?0*(\d+)\.(?:pdf|htm|html)',
+    ]
+    for fuente in fuentes:
+        for patron in patrones:
+            m = re.search(patron, fuente, re.IGNORECASE)
+            if m:
+                return m.group(1)
+    return None
+
+def _extraer_fecha_circular(texto, anio):
+    texto = _limpiar_texto_html(texto)
+    m = re.search(
+        r'(\d{1,2})\s+de\s+([a-zA-Z]+)\s+del?\s+(\d{4})',
+        texto,
+        re.IGNORECASE
+    )
+    if not m:
+        return f"{anio}-01-01"
+    dia, mes, year = m.groups()
+    mes_num = MESES.get(mes.lower())
+    if not mes_num:
+        return f"{anio}-01-01"
+    return f"{year}-{mes_num}-{dia.zfill(2)}"
+
+def _extraer_descripcion_anchor(anchor, titulo):
+    partes = []
+    for sibling in anchor.next_siblings:
+        if getattr(sibling, 'name', None) == 'a':
+            break
+        texto = sibling.get_text(' ', strip=True) if hasattr(sibling, 'get_text') else str(sibling)
+        texto = _limpiar_texto_html(texto)
+        if texto:
+            partes.append(texto)
+        if len(' '.join(partes)) >= 600:
+            break
+
+    if partes:
+        return ' '.join(partes)[:1000]
+
+    parent = anchor.find_parent(['p', 'li', 'td', 'div'])
+    if not parent:
+        return ''
+
+    contexto = _limpiar_texto_html(parent.get_text(' ', strip=True))
+    if titulo and contexto.startswith(titulo):
+        contexto = _limpiar_texto_html(contexto[len(titulo):])
+    return contexto[:1000]
+
+def _resolver_url_pdf_desde_detalle(url_detalle):
+    try:
+        r = SESSION.get(url_detalle, timeout=15)
+        if r.status_code != 200:
+            return None
+        soup = BeautifulSoup(r.text, 'html.parser')
+        for tag in soup.find_all(['a', 'iframe', 'embed', 'object']):
+            href = tag.get('href') or tag.get('src') or tag.get('data')
+            if href and re.search(r'\.pdf(?:$|\?)', href, re.IGNORECASE):
+                return urljoin(url_detalle, href)
+        m = re.search(r"[\"']([^\"']+\.pdf(?:\?[^\"']*)?)[\"']", r.text, re.IGNORECASE)
+        if m:
+            return urljoin(url_detalle, m.group(1))
+    except Exception as e:
+        log.warning(f"  No se pudo resolver PDF desde detalle {url_detalle}: {e}")
+    return None
+
+def _merge_doc_por_numero(docs):
+    merged = {}
+    for doc in docs:
+        numero = str(doc.get('numero', '')).strip()
+        if not numero:
+            continue
+        if numero not in merged:
+            merged[numero] = dict(doc)
+            continue
+        base = merged[numero]
+        for key in ('titulo', 'descripcion', 'fecha', 'url_pdf', 'url_detalle'):
+            nuevo = doc.get(key)
+            if not nuevo:
+                continue
+            if key == 'descripcion':
+                if len(nuevo) > len(base.get(key, '')):
+                    base[key] = nuevo
+            elif not base.get(key):
+                base[key] = nuevo
+    return list(merged.values())
+
+def _parsear_indice_circulares_moderno(html, anio, base_url):
     soup = BeautifulSoup(html, 'html.parser')
     docs = []
     for h5 in soup.find_all('h5'):
         a = h5.find('a')
-        if not a: continue
-        m = re.search(r'circu(\d+)\.pdf', a.get('href',''), re.IGNORECASE)
-        if not m: continue
-        MESES = {'enero':'01','febrero':'02','marzo':'03','abril':'04','mayo':'05',
-                 'junio':'06','julio':'07','agosto':'08','septiembre':'09',
-                 'octubre':'10','noviembre':'11','diciembre':'12'}
-        mf = re.search(r'(\d{1,2})\s+de\s+(\w+)\s+del?\s+(\d{4})', h5.get_text())
-        fecha = f"{anio}-01-01"
-        if mf:
-            d,mes,y = mf.groups()
-            mn = MESES.get(mes.lower())
-            if mn: fecha = f"{y}-{mn}-{d.zfill(2)}"
+        if not a:
+            continue
+        href = a.get('href', '')
+        numero = _extraer_numero_circular(a.get_text(' ', strip=True), href)
+        if not numero:
+            continue
+        fecha = _extraer_fecha_circular(h5.get_text(' ', strip=True), anio)
         sig = h5.find_next_sibling()
-        desc = sig.get_text(strip=True) if sig and sig.name=='p' else ''
-        docs.append({'numero': m.group(1), 'titulo': a.get_text(strip=True), 'descripcion': desc, 'fecha': fecha})
+        desc = sig.get_text(strip=True) if sig and sig.name == 'p' else ''
+        doc = {
+            'numero': numero,
+            'titulo': _limpiar_texto_html(a.get_text(' ', strip=True)),
+            'descripcion': _limpiar_texto_html(desc),
+            'fecha': fecha,
+        }
+        if href:
+            abs_url = urljoin(base_url, href)
+            if re.search(r'\.pdf(?:$|\?)', href, re.IGNORECASE):
+                doc['url_pdf'] = abs_url
+            else:
+                doc['url_detalle'] = abs_url
+        docs.append(doc)
     return docs
+
+def _parsear_indice_circulares_legacy(html, anio, base_url):
+    soup = BeautifulSoup(html, 'html.parser')
+    docs = []
+    for a in soup.find_all('a', href=True):
+        titulo = _limpiar_texto_html(a.get_text(' ', strip=True))
+        if not re.search(r'circular\s*n(?:\D{0,2})\s*\d+', titulo, re.IGNORECASE):
+            continue
+        href = a.get('href', '').strip()
+        numero = _extraer_numero_circular(titulo, href)
+        if not numero:
+            continue
+        doc = {
+            'numero': numero,
+            'titulo': titulo,
+            'descripcion': _extraer_descripcion_anchor(a, titulo),
+            'fecha': _extraer_fecha_circular(titulo, anio),
+        }
+        abs_url = urljoin(base_url, href)
+        if re.search(r'\.pdf(?:$|\?)', href, re.IGNORECASE):
+            doc['url_pdf'] = abs_url
+        else:
+            doc['url_detalle'] = abs_url
+        docs.append(doc)
+    return docs
+
+def parsear_indice_circulares(html, anio, base_url):
+    if anio <= 2012:
+        docs = _parsear_indice_circulares_legacy(html, anio, base_url)
+        if not docs:
+            docs = _parsear_indice_circulares_moderno(html, anio, base_url)
+    else:
+        docs = _parsear_indice_circulares_moderno(html, anio, base_url)
+        if not docs:
+            docs = _parsear_indice_circulares_legacy(html, anio, base_url)
+    return _merge_doc_por_numero(docs)
 
 def parsear_indice_resoluciones(html, anio):
     soup = BeautifulSoup(html, 'html.parser')
@@ -453,25 +726,30 @@ def scrape_anio(tipo_clave, anio, callback=None, delay=0.8):
         if callback: callback(msg, False, 0)
         return {'ok': False, 'total': 0, 'nuevos': 0, 'errores': 0}
 
-    url_indice = INDICES[tipo_clave].format(anio=anio)
-    log.info(f"  Índice: {url_indice}")
-    if callback: callback(f"🔍 Descargando índice {tipo_clave} {anio}...", True, 0)
+    urls_indice = obtener_urls_indice(tipo_clave, anio)
+    url_indice = urls_indice[0]
+    html = None
+    if callback: callback(f"Descargando indice {tipo_clave} {anio}...", True, 0)
 
-    try:
-        r = SESSION.get(url_indice, timeout=15)
-        if r.status_code != 200:
-            msg = f"Índice HTTP {r.status_code} — no existe para {anio}"
-            log.warning(f"  {msg}")
-            if callback: callback(msg, False, 0)
-            return {'ok': False, 'total': 0, 'nuevos': 0, 'errores': 0}
-        r.encoding = 'utf-8'
-        html = r.text
-    except Exception as e:
-        log.error(f"  Error índice: {e}")
-        if callback: callback(str(e), False, 0)
+    for candidata in urls_indice:
+        log.info(f"  Indice: {candidata}")
+        try:
+            r = SESSION.get(candidata, timeout=15)
+            if r.status_code != 200:
+                log.warning(f"  Indice HTTP {r.status_code}: {candidata}")
+                continue
+            r.encoding = 'utf-8'
+            html = r.text
+            url_indice = candidata
+            break
+        except Exception as e:
+            log.warning(f"  Error indice {candidata}: {e}")
+
+    if html is None:
+        msg = f"No se pudo descargar indice para {tipo_clave}/{anio}"
+        if callback: callback(msg, False, 0)
         return {'ok': False, 'total': 0, 'nuevos': 0, 'errores': 0}
-
-    docs = parsear_indice_circulares(html, anio) if tipo_clave == 'circular' else parsear_indice_resoluciones(html, anio)
+    docs = parsear_indice_circulares(html, anio, url_indice) if tipo_clave == 'circular' else parsear_indice_resoluciones(html, anio)
     total = len(docs)
     log.info(f"  {total} documentos en índice")
     if callback: callback(f"📋 {total} documentos en índice {anio}", True, total)
@@ -485,20 +763,42 @@ def scrape_anio(tipo_clave, anio, callback=None, delay=0.8):
                 callback(f"[{i+1}/{total}] Ya indexados: {saltados}", True, total)
             continue
 
-        url_pdf = PDF_URLS[tipo_clave].format(anio=anio, num=numero)
-        pdf_bytes = descargar_pdf(url_pdf, delay=delay)
+        url_pdf = doc_info.get('url_pdf')
+        if not url_pdf and doc_info.get('url_detalle'):
+            url_pdf = _resolver_url_pdf_desde_detalle(doc_info['url_detalle'])
+        if not url_pdf:
+            for candidata in obtener_urls_pdf(tipo_clave, anio, numero):
+                url_pdf = candidata
+                pdf_bytes = descargar_pdf(url_pdf, delay=delay)
+                if pdf_bytes is not None:
+                    break
+            else:
+                pdf_bytes = None
+        else:
+            pdf_bytes = descargar_pdf(url_pdf, delay=delay)
+
+        url_ref = doc_info.get('url_detalle') or url_pdf
+
+        if pdf_bytes is None and tipo_clave == 'circular' and doc_info.get('url_detalle'):
+            html_doc = _descargar_circular_html(doc_info['url_detalle'], anio, doc_info)
+            if html_doc:
+                pdf_bytes = html_doc['pdf_bytes']
+                doc_info = dict(doc_info)
+                doc_info['titulo'] = html_doc.get('titulo') or doc_info.get('titulo')
+                doc_info['descripcion'] = html_doc.get('descripcion') or doc_info.get('descripcion')
+                doc_info['fecha'] = html_doc.get('fecha') or doc_info.get('fecha')
 
         if pdf_bytes is None:
             errores += 1
             log_scraper(tipo_clave, anio, numero, 'no_encontrado', url_pdf)
             if i % 10 == 0 and callback:
-                callback(f"⚠ [{i+1}/{total}] N°{numero}/{anio} no encontrado", False, total)
+                callback(f"[WARN] [{i+1}/{total}] N{numero}/{anio} no encontrado", False, total)
             time.sleep(delay * 0.5)
             continue
 
         ok, nuevo = _procesar_y_guardar(
             pdf_bytes, tipo_norm, tipo_clave, numero, anio,
-            doc_info, url_pdf, callback, i, total
+            doc_info, url_ref, callback, i, total
         )
         if nuevo:    nuevos += 1
         elif not ok: errores += 1
