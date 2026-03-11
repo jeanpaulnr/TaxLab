@@ -3,7 +3,7 @@ SII Normativa V2.0 — Sistema completo con scraping real
 Incluye: Flask app + scheduler diario + panel de control
 """
 
-from flask import Flask, render_template, request, jsonify, Response, stream_with_context
+from flask import Flask, render_template, request, jsonify, Response, stream_with_context, send_file
 import sqlite3, os, json, re, hashlib, threading, logging
 from datetime import datetime, date
 
@@ -94,6 +94,27 @@ CREATE TABLE IF NOT EXISTS articulos_idx (
 CREATE INDEX IF NOT EXISTS idx_art_ley  ON articulos_idx(ley, articulo);
 CREATE INDEX IF NOT EXISTS idx_doc_tipo ON documentos(tipo, anio);
 CREATE INDEX IF NOT EXISTS idx_doc_hash ON documentos(hash_md5);
+CREATE TABLE IF NOT EXISTS judicial_docs (
+    doc_id       INTEGER PRIMARY KEY REFERENCES documentos(id) ON DELETE CASCADE,
+    sii_id       INTEGER UNIQUE,
+    tipo_codigo  TEXT,
+    corte        TEXT,
+    tribunal     TEXT,
+    pdf_local    TEXT,
+    html_local   TEXT
+);
+CREATE TABLE IF NOT EXISTS judicial_relaciones (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    doc_id           INTEGER REFERENCES documentos(id) ON DELETE CASCADE,
+    cuerpo_normativo TEXT,
+    articulo         TEXT,
+    nota             TEXT,
+    UNIQUE(doc_id, cuerpo_normativo, articulo, nota)
+);
+CREATE INDEX IF NOT EXISTS idx_judicial_corte    ON judicial_docs(corte);
+CREATE INDEX IF NOT EXISTS idx_judicial_tribunal ON judicial_docs(tribunal);
+CREATE INDEX IF NOT EXISTS idx_judicial_cuerpo   ON judicial_relaciones(cuerpo_normativo);
+CREATE INDEX IF NOT EXISTS idx_judicial_art      ON judicial_relaciones(articulo);
 CREATE TABLE IF NOT EXISTS historial (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     termino    TEXT,
@@ -145,7 +166,18 @@ def init_db():
     log.info("✅ Base de datos inicializada")
 
 def tipo_formal(tipo):
-    return {'circular':'Circular','oficio':'Oficio','resolucion':'Resolución Exenta'}.get(tipo, tipo.capitalize())
+    return {
+        'circular':'Circular',
+        'oficio':'Oficio',
+        'resolucion':'Resolucion Exenta',
+        'judicial':'Jurisprudencia Judicial',
+    }.get(tipo, tipo.capitalize())
+
+def get_judicial_asset_path(stored_path):
+    if not stored_path:
+        return None
+    norm = stored_path.replace('/', os.sep)
+    return norm if os.path.isabs(norm) else os.path.join(BASE, norm)
 
 # ── Rutas principales ─────────────────────────────────────────────────────
 @app.route('/')
@@ -160,12 +192,22 @@ def index():
     recientes = [dict(r) for r in c.fetchall()]
     c.execute("SELECT ley,articulo,COUNT(*) cnt FROM articulos_idx GROUP BY ley,articulo ORDER BY cnt DESC LIMIT 15")
     top_arts = [dict(r) for r in c.fetchall()]
-    c.execute("SELECT MAX(fecha_carga) FROM documentos WHERE fuente='scraper'")
+    c.execute("SELECT MAX(fecha_carga) FROM documentos WHERE fuente LIKE 'sii_%' OR fuente='scraper'")
     ultima_actualizacion = c.fetchone()[0]
+    try:
+        c.execute("SELECT DISTINCT corte FROM judicial_docs WHERE corte IS NOT NULL AND corte<>'' ORDER BY corte")
+        cortes_judiciales = [r[0] for r in c.fetchall()]
+        c.execute("SELECT DISTINCT cuerpo_normativo FROM judicial_relaciones WHERE cuerpo_normativo IS NOT NULL AND cuerpo_normativo<>'' ORDER BY cuerpo_normativo")
+        cuerpos_judiciales = [r[0] for r in c.fetchall()]
+    except sqlite3.OperationalError:
+        cortes_judiciales, cuerpos_judiciales = [], []
     conn.close()
     return render_template('index.html', total=total, por_tipo=por_tipo,
         por_anio=por_anio, recientes=recientes, top_arts=top_arts,
         materias=MATERIAS, leyes=LEYES,
+        cortes_judiciales=cortes_judiciales,
+        cuerpos_judiciales=cuerpos_judiciales,
+        anio_actual=date.today().year,
         ultima_actualizacion=ultima_actualizacion)
 
 @app.route('/buscar')
@@ -176,18 +218,22 @@ def buscar():
     ley     = request.args.get('ley','')
     materia = request.args.get('materia','')
     art     = request.args.get('articulo','').strip()
+    corte   = request.args.get('corte','').strip()
+    cuerpo  = request.args.get('cuerpo','').strip()
+    vigente = request.args.get('vigente','').strip()
     page    = max(1, int(request.args.get('page', 1)))
     per     = 15
 
     conn = get_db(); c = conn.cursor()
     where, params = [], []
+    joins = "LEFT JOIN judicial_docs jd ON jd.doc_id=d.id LEFT JOIN judicial_relaciones jr ON jr.doc_id=d.id"
 
     if q:
         try:
             fts_q = ' OR '.join(f'"{w}"' if len(w)>3 else w for w in q.split())
             c.execute('SELECT rowid FROM docs_fts WHERE docs_fts MATCH ? ORDER BY rank LIMIT 500', (fts_q,))
             ids = [r[0] for r in c.fetchall()]
-        except:
+        except Exception:
             ids = []
         if ids:
             where.append(f"d.id IN ({','.join(['?']*len(ids))})")
@@ -197,34 +243,58 @@ def buscar():
             where.append("(d.titulo LIKE ? OR d.contenido LIKE ? OR d.palabras_clave LIKE ? OR d.resumen LIKE ?)")
             params.extend([like]*4)
 
-    if tipo:    where.append("d.tipo=?");               params.append(tipo)
-    if anio:    where.append("d.anio=?");               params.append(int(anio))
-    if ley:     where.append("d.leyes_citadas LIKE ?"); params.append(f'%"{ley}"%')
-    if materia: where.append("d.materia LIKE ?");       params.append(f'%{materia}%')
-    if art:     where.append("d.articulos_clave LIKE ?"); params.append(f'%{art}%')
+    if tipo:
+        where.append("d.tipo=?")
+        params.append(tipo)
+    if anio:
+        where.append("d.anio=?")
+        params.append(int(anio))
+    if ley:
+        where.append("d.leyes_citadas LIKE ?")
+        params.append(f'%"{ley}"%')
+    if materia:
+        where.append("d.materia LIKE ?")
+        params.append(f'%{materia}%')
+    if art:
+        where.append("(d.articulos_clave LIKE ? OR jr.articulo LIKE ?)")
+        params.extend([f'%{art}%', f'%{art}%'])
+    if corte:
+        where.append("jd.corte=?")
+        params.append(corte)
+    if cuerpo:
+        where.append("jr.cuerpo_normativo=?")
+        params.append(cuerpo)
+    if vigente in ('0', '1'):
+        where.append("d.vigente=?")
+        params.append(int(vigente))
 
     clause = ("WHERE " + " AND ".join(where)) if where else ""
+    base_from = f"FROM documentos d {joins} {clause}"
 
-    c.execute(f"SELECT COUNT(*) FROM documentos d {clause}", params)
+    c.execute(f"SELECT COUNT(*) FROM (SELECT d.id {base_from} GROUP BY d.id)", params)
     total = c.fetchone()[0]
 
     c.execute(f"""
         SELECT d.id,d.tipo,d.numero,d.anio,d.fecha,d.titulo,d.materia,
                d.referencia,d.resumen,d.leyes_citadas,d.articulos_clave,
-               d.vigente,d.paginas,d.chars_texto,
-               SUBSTR(d.contenido,1,500) extracto
-        FROM documentos d {clause}
-        ORDER BY d.anio DESC, CAST(d.numero AS INTEGER) DESC
+               d.vigente,d.paginas,d.chars_texto,d.url_sii,
+               jd.corte,jd.tribunal,jd.tipo_codigo,jd.pdf_local,
+               GROUP_CONCAT(DISTINCT jr.cuerpo_normativo) AS cuerpos_normativos,
+               SUBSTR(d.contenido,1,700) extracto
+        {base_from}
+        GROUP BY d.id
+        ORDER BY COALESCE(d.fecha,'') DESC, d.id DESC
         LIMIT ? OFFSET ?
     """, params + [per, (page-1)*per])
     rows = c.fetchall()
 
-    if q or tipo or ley or art:
+    if q or tipo or ley or art or corte or cuerpo or vigente:
         try:
             c.execute("INSERT INTO historial(termino,filtros,resultados) VALUES(?,?,?)",
-                      (q, json.dumps({'tipo':tipo,'ley':ley,'art':art}), total))
+                      (q, json.dumps({'tipo':tipo,'ley':ley,'art':art,'corte':corte,'cuerpo':cuerpo,'vigente':vigente}), total))
             conn.commit()
-        except: pass
+        except Exception:
+            pass
     conn.close()
 
     resultados = []
@@ -234,15 +304,22 @@ def buscar():
             for word in q.split():
                 if len(word) > 2:
                     extracto = re.sub(f'(?i)({re.escape(word)})', r'<mark>\1</mark>', extracto)
+        cuerpos_normativos = [x.strip() for x in (r['cuerpos_normativos'] or '').split(',') if x and x.strip()]
         resultados.append({
             'id': r['id'], 'tipo': r['tipo'], 'numero': r['numero'],
             'anio': r['anio'], 'fecha': r['fecha'], 'titulo': r['titulo'],
             'materia': r['materia'], 'referencia': r['referencia'],
-            'extracto': extracto[:500] + ('…' if len(extracto) > 500 else ''),
+            'extracto': extracto[:700] + ('...' if len(extracto) > 700 else ''),
             'leyes': json.loads(r['leyes_citadas'] or '[]'),
             'articulos': json.loads(r['articulos_clave'] or '[]')[:5],
             'vigente': r['vigente'],
             'paginas': r['paginas'] or 0,
+            'url_sii': r['url_sii'],
+            'corte': r['corte'],
+            'tribunal': r['tribunal'],
+            'tipo_codigo': r['tipo_codigo'],
+            'cuerpos_normativos': cuerpos_normativos,
+            'pdf_url': f"/documento/{r['id']}/pdf" if r['pdf_local'] else '',
         })
 
     return jsonify({'resultados': resultados, 'total': total,
@@ -251,15 +328,43 @@ def buscar():
 @app.route('/documento/<int:doc_id>')
 def ver_documento(doc_id):
     conn = get_db(); c = conn.cursor()
-    c.execute("SELECT * FROM documentos WHERE id=?", (doc_id,))
+    c.execute("""
+        SELECT d.*, jd.sii_id, jd.tipo_codigo, jd.corte, jd.tribunal, jd.pdf_local, jd.html_local
+        FROM documentos d
+        LEFT JOIN judicial_docs jd ON jd.doc_id=d.id
+        WHERE d.id=?
+    """, (doc_id,))
     row = c.fetchone()
     if not row:
+        conn.close()
         return "Documento no encontrado", 404
     doc = dict(row)
     doc['leyes_citadas']   = json.loads(doc.get('leyes_citadas') or '[]')
     doc['articulos_clave'] = json.loads(doc.get('articulos_clave') or '[]')
+    doc['pdf_url'] = f"/documento/{doc_id}/pdf" if doc.get('pdf_local') else None
 
-    # Relacionados por artículos
+    judicial_relaciones = []
+    judicial_por_norma = []
+    if doc['tipo'] == 'judicial':
+        c.execute("""
+            SELECT cuerpo_normativo, articulo, nota
+            FROM judicial_relaciones
+            WHERE doc_id=?
+            ORDER BY cuerpo_normativo, articulo, nota
+        """, (doc_id,))
+        judicial_relaciones = [dict(r) for r in c.fetchall()]
+        agrupado = {}
+        for rel in judicial_relaciones:
+            cuerpo = rel['cuerpo_normativo'] or 'Sin cuerpo normativo'
+            valor = rel['articulo'] or ''
+            if rel.get('nota'):
+                valor = f"{valor} ({rel['nota']})" if valor else rel['nota']
+            agrupado.setdefault(cuerpo, []).append(valor or 'Sin articulo')
+        judicial_por_norma = [
+            {'cuerpo_normativo': k, 'articulos': v}
+            for k, v in agrupado.items()
+        ]
+
     arts = doc['articulos_clave'][:4]
     relacionados = []
     if arts:
@@ -272,7 +377,6 @@ def ver_documento(doc_id):
         """, arts + [doc_id])
         relacionados = [dict(r) for r in c.fetchall()]
 
-    # Historial de norma (mismos número/tipo de otros años)
     c.execute("""
         SELECT id,tipo,numero,anio,titulo,referencia,vigente
         FROM documentos WHERE tipo=? AND numero=? AND id!=?
@@ -282,30 +386,70 @@ def ver_documento(doc_id):
 
     conn.close()
     return render_template('documento.html', doc=doc,
-                           relacionados=relacionados, historial=historial)
+                           relacionados=relacionados, historial=historial,
+                           judicial_relaciones=judicial_relaciones,
+                           judicial_por_norma=judicial_por_norma)
+
+@app.route('/documento/<int:doc_id>/pdf')
+def descargar_pdf_documento(doc_id):
+    conn = get_db(); c = conn.cursor()
+    c.execute("""
+        SELECT d.tipo, d.referencia, jd.pdf_local
+        FROM documentos d
+        LEFT JOIN judicial_docs jd ON jd.doc_id=d.id
+        WHERE d.id=?
+    """, (doc_id,))
+    row = c.fetchone()
+    conn.close()
+    if not row or row['tipo'] != 'judicial' or not row['pdf_local']:
+        return "PDF no disponible", 404
+
+    abs_path = get_judicial_asset_path(row['pdf_local'])
+    if not abs_path or not os.path.exists(abs_path):
+        return "PDF no encontrado en disco", 404
+
+    return send_file(abs_path, as_attachment=True, download_name=os.path.basename(abs_path))
 
 @app.route('/api/cita/<int:doc_id>')
 def cita(doc_id):
     conn = get_db(); c = conn.cursor()
     c.execute("SELECT * FROM documentos WHERE id=?", (doc_id,))
-    r = dict(c.fetchone()); conn.close()
+    row = c.fetchone()
+    conn.close()
+    r = dict(row)
     tf = tipo_formal(r['tipo'])
     resumen_txt = (r.get('resumen') or r.get('contenido') or '')[:400]
     fecha_fmt = r.get('fecha') or str(r.get('anio',''))
     mat = r.get('materia') or 'normativa tributaria'
+
+    if r['tipo'] == 'judicial':
+        base_ref = r.get('referencia') or f"{tf} {r.get('numero','')}"
+        return jsonify({
+            'cita_corta':  base_ref,
+            'cita_media':  f"Conforme a lo resuelto en {base_ref}",
+            'cita_larga':  (
+                f"En {base_ref}, de fecha {fecha_fmt}, se sostuvo que: \"{resumen_txt}...\""
+            ),
+            'cita_escrito': (
+                f"En apoyo de lo expuesto, cabe citar {base_ref}, donde se razona que: \"{resumen_txt}...\". "
+                f"El texto integro y su respaldo documental se encuentran disponibles en {r.get('url_sii','www.sii.cl')}."
+            ),
+            'url': r.get('url_sii'), 'referencia': base_ref
+        })
+
     return jsonify({
-        'cita_corta':  f"{tf} N°{r['numero']} de {r['anio']} del SII",
-        'cita_media':  f"Conforme a lo señalado por el SII en {tf} N°{r['numero']} de {r['anio']}, en materia de {mat}",
+        'cita_corta':  f"{tf} N{r['numero']} de {r['anio']} del SII",
+        'cita_media':  f"Conforme a lo senalado por el SII en {tf} N{r['numero']} de {r['anio']}, en materia de {mat}",
         'cita_larga':  (
-            f"En virtud de lo establecido en {tf} N°{r['numero']} de fecha {fecha_fmt}, "
+            f"En virtud de lo establecido en {tf} N{r['numero']} de fecha {fecha_fmt}, "
             f"emanada del Servicio de Impuestos Internos, en materia de {mat}, "
-            f"dicho organismo ha señalado que: \"{resumen_txt}...\""
+            f"dicho organismo ha senalado que: \"{resumen_txt}...\""
         ),
         'cita_escrito': (
-            f"En este contexto, cabe traer a colación lo señalado por el SII en su {tf} N°{r['numero']} "
+            f"En este contexto, cabe traer a colacion lo senalado por el SII en su {tf} N{r['numero']} "
             f"de {r['anio']} (ref. {r.get('referencia','')}), donde se establece que: "
             f"\"{resumen_txt}...\". "
-            f"Dicha instrucción administrativa se encuentra disponible en {r.get('url_sii','www.sii.cl')}."
+            f"Dicha instruccion administrativa se encuentra disponible en {r.get('url_sii','www.sii.cl')}."
         ),
         'url': r.get('url_sii'), 'referencia': r.get('referencia')
     })

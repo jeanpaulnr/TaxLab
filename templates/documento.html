@@ -1,11 +1,12 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>{{ doc.referencia }} · SII Normativa</title>
 <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;0,700;1,400&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#0e0e0e;--s:#161616;--s2:#1e1e1e;--s3:#262626;--ink:#f0ece4;--ink2:#b8b0a4;--muted:#6b6460;--rule:#2a2a2a;--gold:#c8991e;--gold-lt:#e8b83a;--circ:#3a7abf;--ofic:#bf7a3a;--reso:#3abf6a;--red:#bf3a3a;--green:#3abf6a}
+:root{--bg:#0e0e0e;--s:#161616;--s2:#1e1e1e;--s3:#262626;--ink:#f0ece4;--ink2:#b8b0a4;--muted:#6b6460;--rule:#2a2a2a;--gold:#c8991e;--gold-lt:#e8b83a;--circ:#3a7abf;--ofic:#bf7a3a;--reso:#3abf6a;--jud:#7a9fbf;--red:#bf3a3a;--green:#3abf6a}
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink)}
 header{background:var(--s);border-bottom:1px solid var(--rule);display:flex;align-items:center;justify-content:space-between;padding:0 1.5rem;height:52px}
@@ -14,7 +15,7 @@ header{background:var(--s);border-bottom:1px solid var(--rule);display:flex;alig
 .logo-name{font-family:'Crimson Pro',serif;font-size:18px;font-weight:600;color:var(--ink)}
 .back{padding:5px 12px;border:1px solid var(--rule);border-radius:3px;color:var(--ink2);text-decoration:none;font-size:12px;transition:all .15s}
 .back:hover{border-color:var(--gold);color:var(--gold)}
-.wrap{display:grid;grid-template-columns:1fr 300px;max-width:1200px;margin:0 auto;padding:32px 1.5rem 80px;gap:24px}
+.wrap{display:grid;grid-template-columns:minmax(0,1fr) 320px;max-width:1240px;margin:0 auto;padding:32px 1.5rem 80px;gap:24px}
 .section{background:var(--s);border:1px solid var(--rule);border-radius:5px;overflow:hidden;margin-bottom:14px}
 .sh{background:var(--s2);border-bottom:1px solid var(--rule);padding:10px 16px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--gold);text-transform:uppercase}
 .sb{padding:18px}
@@ -23,6 +24,7 @@ h1{font-family:'Crimson Pro',serif;font-size:clamp(20px,3vw,28px);font-weight:70
 .bc{color:var(--circ);border-color:rgba(58,122,191,.3);background:rgba(58,122,191,.08)}
 .bo{color:var(--ofic);border-color:rgba(191,122,58,.3);background:rgba(191,122,58,.08)}
 .br{color:var(--reso);border-color:rgba(58,191,106,.3);background:rgba(58,191,106,.08)}
+.bj{color:var(--jud);border-color:rgba(122,159,191,.35);background:rgba(122,159,191,.08)}
 .bl{padding:2px 6px;border-radius:2px;font-family:'DM Mono',monospace;font-size:9px;background:var(--s3);color:var(--muted)}
 .bl.lir{color:var(--circ);background:rgba(58,122,191,.12)}
 .bl.livs{color:var(--ofic);background:rgba(191,122,58,.12)}
@@ -30,9 +32,10 @@ h1{font-family:'Crimson Pro',serif;font-size:clamp(20px,3vw,28px);font-weight:70
 .bd{background:var(--red);color:#fff;font-size:8px;padding:2px 6px;border-radius:2px;font-family:'DM Mono',monospace;letter-spacing:.5px}
 .tipo-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px}
 .meta-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.meta-grid.judicial{grid-template-columns:repeat(4,1fr)}
 .mc{background:var(--s2);border:1px solid var(--rule);border-radius:3px;padding:12px}
 .ml{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:2px;color:var(--gold);text-transform:uppercase;margin-bottom:5px}
-.mv{font-size:13px;font-weight:500;color:var(--ink)}
+.mv{font-size:13px;font-weight:500;color:var(--ink);line-height:1.45}
 .resumen{font-family:'Crimson Pro',serif;font-size:15px;line-height:1.78;color:var(--ink2);border-left:2px solid var(--gold);padding-left:14px;font-style:italic}
 .content{font-size:13px;line-height:1.85;color:var(--ink);white-space:pre-wrap}
 .kw-wrap{display:flex;flex-wrap:wrap;gap:5px}
@@ -42,16 +45,14 @@ h1{font-family:'Crimson Pro',serif;font-size:clamp(20px,3vw,28px);font-weight:70
 .cita-block{background:var(--s2);border:1px solid var(--rule);border-radius:3px;padding:12px;margin-bottom:10px}
 .cl{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:2px;color:var(--gold);text-transform:uppercase;margin-bottom:7px}
 .ct{font-family:'Crimson Pro',serif;font-size:12px;line-height:1.7;color:var(--ink);user-select:all}
-.btn{padding:7px 13px;border-radius:3px;font-size:11px;font-weight:500;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:5px;transition:all .15s;font-family:'DM Sans',sans-serif}
+.btn{padding:7px 13px;border-radius:3px;font-size:11px;font-weight:500;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:5px;transition:all .15s;font-family:'DM Sans',sans-serif;text-decoration:none}
 .btn-gold{background:var(--gold);color:#000}.btn-gold:hover{background:var(--gold-lt)}
 .btn-s{background:var(--s2);border:1px solid var(--rule);color:var(--ink2)}.btn-s:hover{border-color:var(--gold);color:var(--gold)}
 .btn-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
-/* Sidebar */
 .rel-card{display:block;padding:10px;background:var(--s2);border:1px solid var(--rule);border-radius:3px;margin-bottom:7px;text-decoration:none;transition:all .15s}
 .rel-card:hover{border-color:var(--gold)}
 .rel-ref{font-family:'DM Mono',monospace;font-size:9px;color:var(--gold);margin-bottom:3px}
 .rel-title{font-size:11px;line-height:1.4;color:var(--ink2)}
-/* Historial timeline */
 .tl-item{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--rule)}
 .tl-item:last-child{border:none}
 .tl-anio{font-family:'DM Mono',monospace;font-size:11px;font-weight:500;color:var(--gold);min-width:40px}
@@ -59,163 +60,205 @@ h1{font-family:'Crimson Pro',serif;font-size:clamp(20px,3vw,28px);font-weight:70
 .tl-ref a{color:var(--ink2);text-decoration:none}
 .tl-ref a:hover{color:var(--gold)}
 .tl-vigente{font-family:'DM Mono',monospace;font-size:8px;color:var(--muted)}
-/* Toast */
+.jnorm{display:grid;grid-template-columns:240px 1fr;gap:10px;padding:10px 0;border-bottom:1px solid var(--rule)}
+.jnorm:last-child{border:none}
+.jnorm-name{font-size:12px;font-weight:600;color:var(--ink2)}
+.jnorm-arts{display:flex;flex-wrap:wrap;gap:5px}
+.jpill{padding:2px 7px;background:var(--s2);border:1px solid var(--rule);border-radius:2px;font-family:'DM Mono',monospace;font-size:10px;color:var(--ink2)}
 .toast{position:fixed;bottom:20px;right:20px;background:var(--green);color:#000;padding:8px 14px;border-radius:3px;font-size:11px;font-weight:600;transform:translateY(40px);opacity:0;transition:all .25s;z-index:400}
 .toast.show{transform:translateY(0);opacity:1}
+@media(max-width:980px){.wrap{grid-template-columns:1fr}.meta-grid,.meta-grid.judicial{grid-template-columns:repeat(2,1fr)}.jnorm{grid-template-columns:1fr}}
+@media(max-width:640px){.meta-grid,.meta-grid.judicial{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 <header>
   <a href="/" class="logo"><span class="logo-badge">SII</span><span class="logo-name">Normativa</span></a>
-  <a href="/" class="back">← Volver a búsqueda</a>
+  <a href="/" class="back">← Volver a busqueda</a>
 </header>
 
 <div class="wrap">
-<div>
-  <!-- Cabecera doc -->
-  <div class="section">
-    <div class="sb">
-      <div class="tipo-row">
-        <span class="badge b{{ doc.tipo[0] }}">{{ doc.tipo }}</span>
-        {% for l in doc.leyes_citadas %}<span class="bl {{ l.lower() }}">{{ l }}</span>{% endfor %}
-        {% if not doc.vigente %}<span class="bd">DEROGADA/MODIFICADA</span>{% endif %}
-      </div>
-      <h1>{{ doc.titulo }}</h1>
-      <div class="meta-grid">
-        <div class="mc"><div class="ml">Referencia</div><div class="mv">{{ doc.referencia }}</div></div>
-        <div class="mc"><div class="ml">Fecha</div><div class="mv">{{ doc.fecha or doc.anio }}</div></div>
-        <div class="mc"><div class="ml">Páginas PDF</div><div class="mv">{{ doc.paginas or '–' }}</div></div>
+  <div>
+    <div class="section">
+      <div class="sb">
+        <div class="tipo-row">
+          <span class="badge b{{ doc.tipo[0] }}">{{ doc.tipo }}</span>
+          {% for l in doc.leyes_citadas %}<span class="bl {{ l.lower() }}">{{ l }}</span>{% endfor %}
+          {% if not doc.vigente %}<span class="bd">DEROGADA/MODIFICADA</span>{% endif %}
+        </div>
+        <h1>{{ doc.titulo }}</h1>
+        <div class="meta-grid {% if doc.tipo == 'judicial' %}judicial{% endif %}">
+          <div class="mc"><div class="ml">Referencia</div><div class="mv">{{ doc.referencia }}</div></div>
+          <div class="mc"><div class="ml">Fecha</div><div class="mv">{{ doc.fecha or doc.anio }}</div></div>
+          <div class="mc"><div class="ml">Paginas PDF</div><div class="mv">{{ doc.paginas or '-' }}</div></div>
+          {% if doc.tipo == 'judicial' %}
+          <div class="mc"><div class="ml">Corte</div><div class="mv">{{ doc.corte or '-' }}</div></div>
+          <div class="mc"><div class="ml">Tribunal</div><div class="mv">{{ doc.tribunal or '-' }}</div></div>
+          <div class="mc"><div class="ml">Tipo codigo</div><div class="mv">{{ doc.tipo_codigo or '-' }}</div></div>
+          <div class="mc"><div class="ml">Rol / codigo</div><div class="mv">{{ doc.numero or '-' }}</div></div>
+          <div class="mc"><div class="ml">SII ID</div><div class="mv">{{ doc.sii_id or '-' }}</div></div>
+          {% endif %}
+        </div>
+        <div class="btn-row">
+          {% if doc.pdf_url %}<a href="{{ doc.pdf_url }}" class="btn btn-gold" target="_blank">Descargar PDF local</a>{% endif %}
+          {% if doc.url_sii %}<a href="{{ doc.url_sii }}" class="btn btn-s" target="_blank">Abrir fuente SII</a>{% endif %}
+        </div>
       </div>
     </div>
-  </div>
 
-  {% if doc.resumen %}
-  <div class="section">
-    <div class="sh">📌 Resumen ejecutivo</div>
-    <div class="sb"><div class="resumen">{{ doc.resumen }}</div></div>
-  </div>
-  {% endif %}
-
-  {% if doc.materia %}
-  <div class="section">
-    <div class="sh">📂 Clasificación</div>
-    <div class="sb">
-      <div style="font-size:14px;font-weight:500;margin-bottom:4px">{{ doc.materia }}</div>
-      {% if doc.subtema %}<div style="font-size:12px;color:var(--muted)">{{ doc.subtema }}</div>{% endif %}
+    {% if doc.resumen %}
+    <div class="section">
+      <div class="sh">Resumen ejecutivo</div>
+      <div class="sb"><div class="resumen">{{ doc.resumen }}</div></div>
     </div>
-  </div>
-  {% endif %}
+    {% endif %}
 
-  {% if doc.articulos_clave %}
-  <div class="section">
-    <div class="sh">⚖️ Artículos referenciados</div>
-    <div class="sb">
-      <div class="kw-wrap">
-        {% for a in doc.articulos_clave %}
-        <span class="art-tag" onclick="location.href='/?q={{ a }}'">{{ a }}</span>
+    {% if doc.tipo == 'judicial' and judicial_por_norma %}
+    <div class="section">
+      <div class="sh">Relaciones normativas judiciales</div>
+      <div class="sb">
+        {% for grupo in judicial_por_norma %}
+        <div class="jnorm">
+          <div class="jnorm-name">{{ grupo.cuerpo_normativo }}</div>
+          <div class="jnorm-arts">
+            {% for art in grupo.articulos %}<span class="jpill">{{ art }}</span>{% endfor %}
+          </div>
+        </div>
         {% endfor %}
       </div>
     </div>
-  </div>
-  {% endif %}
+    {% endif %}
 
-  {% if doc.contenido %}
-  <div class="section">
-    <div class="sh">📄 Texto extraído del PDF</div>
-    <div class="sb"><div class="content">{{ doc.contenido[:8000] }}{% if doc.contenido|length > 8000 %}
-…
-[Texto truncado para visualización — {{ doc.chars_texto or 0 | int }} caracteres totales]{% endif %}</div></div>
-  </div>
-  {% endif %}
+    {% if doc.materia or doc.subtema %}
+    <div class="section">
+      <div class="sh">Clasificacion</div>
+      <div class="sb">
+        {% if doc.materia %}<div style="font-size:14px;font-weight:500;margin-bottom:4px">{{ doc.materia }}</div>{% endif %}
+        {% if doc.subtema %}<div style="font-size:12px;color:var(--muted)">{{ doc.subtema }}</div>{% endif %}
+      </div>
+    </div>
+    {% endif %}
 
-  {% if doc.palabras_clave %}
-  <div class="section">
-    <div class="sh">🏷️ Palabras clave</div>
-    <div class="sb">
-      <div class="kw-wrap">
-        {% for k in doc.palabras_clave.split(',') %}<span class="kw">{{ k.strip() }}</span>{% endfor %}
+    {% if doc.articulos_clave %}
+    <div class="section">
+      <div class="sh">Articulos referenciados</div>
+      <div class="sb">
+        <div class="kw-wrap">
+          {% for a in doc.articulos_clave %}
+          <span class="art-tag" onclick="location.href='/?q={{ a|urlencode }}'">{{ a }}</span>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if doc.contenido %}
+    <div class="section">
+      <div class="sh">{% if doc.tipo == 'judicial' %}Pronunciamiento completo{% else %}Texto extraido del PDF{% endif %}</div>
+      <div class="sb">
+        {% if doc.tipo == 'judicial' %}
+        <div class="content">{{ doc.contenido }}</div>
+        {% else %}
+        <div class="content">{{ doc.contenido[:8000] }}{% if doc.contenido|length > 8000 %}
+...
+[Texto truncado para visualizacion - {{ doc.chars_texto or 0 | int }} caracteres totales]{% endif %}</div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if doc.palabras_clave %}
+    <div class="section">
+      <div class="sh">Palabras clave</div>
+      <div class="sb">
+        <div class="kw-wrap">
+          {% for k in doc.palabras_clave.split('|') if k.strip() %}<span class="kw">{{ k.strip() }}</span>{% endfor %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="section">
+      <div class="sh">Generador de citas</div>
+      <div class="sb" id="citas-area">
+        <div style="color:var(--muted);font-size:12px;text-align:center;padding:16px">Cargando...</div>
       </div>
     </div>
   </div>
-  {% endif %}
 
-  <!-- Citas -->
-  <div class="section">
-    <div class="sh">📋 Generador de citas formales</div>
-    <div class="sb" id="citas-area">
-      <div style="color:var(--muted);font-size:12px;text-align:center;padding:16px">Cargando…</div>
-    </div>
-  </div>
-</div>
-
-<!-- Sidebar -->
-<div>
-  {% if relacionados %}
-  <div class="section">
-    <div class="sh">🔗 Normas relacionadas</div>
-    <div class="sb">
-      <div style="font-size:10px;color:var(--muted);margin-bottom:10px">Comparten artículos citados</div>
-      {% for r in relacionados %}
-      <a href="/documento/{{ r.id }}" class="rel-card">
-        <div class="rel-ref">{{ r.referencia }}</div>
-        <div class="rel-title">{{ r.titulo[:70] }}{% if r.titulo|length > 70 %}…{% endif %}</div>
-      </a>
-      {% endfor %}
-    </div>
-  </div>
-  {% endif %}
-
-  {% if historial %}
-  <div class="section">
-    <div class="sh">📅 Historial de esta norma</div>
-    <div class="sb">
-      <div style="font-size:10px;color:var(--muted);margin-bottom:10px">Mismo número, distintos años</div>
-      {% for h in historial %}
-      <div class="tl-item">
-        <div class="tl-anio">{{ h.anio }}</div>
-        <div><div class="tl-ref"><a href="/documento/{{ h.id }}">{{ h.referencia }}</a></div>
-        <div class="tl-vigente">{% if not h.vigente %}DEROGADA{% else %}Vigente{% endif %}</div></div>
+  <div>
+    {% if relacionados %}
+    <div class="section">
+      <div class="sh">Normas relacionadas</div>
+      <div class="sb">
+        <div style="font-size:10px;color:var(--muted);margin-bottom:10px">Comparten articulos citados</div>
+        {% for r in relacionados %}
+        <a href="/documento/{{ r.id }}" class="rel-card">
+          <div class="rel-ref">{{ r.referencia }}</div>
+          <div class="rel-title">{{ r.titulo[:70] }}{% if r.titulo|length > 70 %}...{% endif %}</div>
+        </a>
+        {% endfor %}
       </div>
-      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if historial %}
+    <div class="section">
+      <div class="sh">Historial de esta norma</div>
+      <div class="sb">
+        <div style="font-size:10px;color:var(--muted);margin-bottom:10px">Mismo numero, distintos anios</div>
+        {% for h in historial %}
+        <div class="tl-item">
+          <div class="tl-anio">{{ h.anio }}</div>
+          <div>
+            <div class="tl-ref"><a href="/documento/{{ h.id }}">{{ h.referencia }}</a></div>
+            <div class="tl-vigente">{% if not h.vigente %}DEROGADA{% else %}Vigente{% endif %}</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="section">
+      <div class="sh">Fuente y descarga</div>
+      <div class="sb">
+        <div class="btn-row" style="margin-top:0">
+          {% if doc.pdf_url %}<a href="{{ doc.pdf_url }}" class="btn btn-gold" target="_blank">PDF local</a>{% endif %}
+          {% if doc.url_sii %}<a href="{{ doc.url_sii }}" class="btn btn-s" target="_blank">SII.cl</a>{% endif %}
+        </div>
+      </div>
     </div>
   </div>
-  {% endif %}
-
-  {% if doc.url_sii %}
-  <div class="section">
-    <div class="sh">🌐 Fuente oficial</div>
-    <div class="sb">
-      <a href="{{ doc.url_sii }}" target="_blank" class="btn btn-s" style="width:100%;justify-content:center">Ver PDF en SII.cl ↗</a>
-    </div>
-  </div>
-  {% endif %}
-</div>
 </div>
 
-<div class="toast" id="toast">✓ Copiado</div>
+<div class="toast" id="toast">Copiado</div>
 
 <script>
 async function cargarCitas(){
   const d = await (await fetch('/api/cita/{{ doc.id }}')).json();
-  document.getElementById('citas-area').innerHTML=`
+  document.getElementById('citas-area').innerHTML = `
     <div class="cita-block"><div class="cl">Cita corta</div><div class="ct" id="c1">${d.cita_corta}</div></div>
     <div class="cita-block"><div class="cl">Cita media</div><div class="ct" id="c2">${d.cita_media}</div></div>
-    <div class="cita-block"><div class="cl">Cita para respuesta al SII</div><div class="ct" id="c3">${d.cita_larga}</div></div>
-    <div class="cita-block"><div class="cl">Cita para escrito formal / recurso</div><div class="ct" id="c4">${d.cita_escrito||d.cita_larga}</div></div>
+    <div class="cita-block"><div class="cl">Cita larga</div><div class="ct" id="c3">${d.cita_larga}</div></div>
+    <div class="cita-block"><div class="cl">Cita para escrito</div><div class="ct" id="c4">${d.cita_escrito || d.cita_larga}</div></div>
     <div class="btn-row">
       <button class="btn btn-s" onclick="cp('c1')">Corta</button>
       <button class="btn btn-s" onclick="cp('c2')">Media</button>
-      <button class="btn btn-s" onclick="cp('c3')">Respuesta SII</button>
-      <button class="btn btn-gold" onclick="cp('c4')">📋 Escrito formal</button>
+      <button class="btn btn-s" onclick="cp('c3')">Larga</button>
+      <button class="btn btn-gold" onclick="cp('c4')">Escrito</button>
     </div>`;
 }
 cargarCitas();
 
 function cp(id){
   navigator.clipboard.writeText(document.getElementById(id).textContent.trim()).then(()=>{
-    const t=document.getElementById('toast');t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2000);
+    const t = document.getElementById('toast');
+    t.classList.add('show');
+    setTimeout(()=>t.classList.remove('show'), 2000);
   });
 }
 </script>
 </body>
 </html>
+
