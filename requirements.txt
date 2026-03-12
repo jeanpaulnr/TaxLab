@@ -1,6 +1,8 @@
-flask>=2.3
+﻿flask>=2.3
 requests>=2.31
 beautifulsoup4>=4.12
 lxml>=4.9
 PyMuPDF>=1.23
 schedule>=1.2
+charset-normalizer>=3.3
+Pillow>=10
