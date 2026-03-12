@@ -24,12 +24,15 @@ import shutil
 import subprocess
 import tempfile
 import time
+import textwrap
 from collections import OrderedDict
 from urllib.parse import urljoin, urlparse
 
 import charset_normalizer
 from bs4 import BeautifulSoup, Comment
 from PIL import Image, ImageChops, ImageFilter, ImageOps
+import fitz
+from pdf_layout import PDF_ROOT
 
 try:
     from rapidocr_onnxruntime import RapidOCR
@@ -51,7 +54,7 @@ from scraper.engine import (
 )
 
 BASE = os.path.dirname(os.path.abspath(__file__))
-PDF_HIST_DIR = os.path.join(BASE, 'pdfs', 'circulares_historicas')
+PDF_HIST_DIR = os.path.join(PDF_ROOT, 'circular')
 HTML_DIR = os.path.join(BASE, 'html_historico')
 DOC_DIR = os.path.join(BASE, 'doc_historico')
 IMG_DIR = os.path.join(BASE, 'img_historico')
@@ -247,7 +250,48 @@ def guardar_imagen(nombre, anio, idx, img_url, raw_bytes):
     return path, os.path.relpath(path, BASE)
 
 
-def extraer_texto_html(soup):
+def es_linea_ruido_historico(linea):
+    linea = limpiar_texto(linea)
+    if not linea:
+        return True
+    if linea.startswith('Home |'):
+        return True
+    if re.fullmatch(r'(?:\[\d+\],?\s*)+', linea):
+        return True
+    if re.fullmatch(r'circulares\s+\d{4}', linea, re.IGNORECASE):
+        return True
+    return False
+
+
+def deduplicar_lineas(lineas):
+    resultado = []
+    anterior = None
+    for linea in lineas:
+        if not linea:
+            continue
+        if linea == anterior:
+            continue
+        resultado.append(linea)
+        anterior = linea
+    return resultado
+
+
+def extraer_metadata_html(soup, fallback_title=''):
+    title_tag = soup.find('title')
+    title_text = limpiar_texto(reparar_mojibake(title_tag.get_text(' ', strip=True))) if title_tag else ''
+    meta = soup.find('meta', attrs={'name': re.compile(r'^description$', re.I)})
+    meta_text = limpiar_texto(reparar_mojibake(meta.get('content', ''))) if meta else ''
+
+    titulo = normalizar_texto_ocr(title_text or fallback_title or '')
+    materia = normalizar_texto_ocr(meta_text)
+    if materia.upper().startswith('MATERIA:'):
+        materia = limpiar_texto(materia.split(':', 1)[1])
+    return titulo, materia
+
+
+def extraer_texto_html(soup, titulo='', materia=''):
+    soup = BeautifulSoup(str(soup), 'lxml')
+
     for comentario in soup.find_all(string=lambda t: isinstance(t, Comment)):
         comentario.extract()
 
@@ -257,23 +301,28 @@ def extraer_texto_html(soup):
     for br in soup.find_all('br'):
         br.replace_with('\n')
 
-    for table in soup.find_all('table'):
-        filas = []
-        for tr in table.find_all('tr'):
-            celdas = [limpiar_texto(td.get_text(' ', strip=True)) for td in tr.find_all(['th', 'td'])]
-            celdas = [c for c in celdas if c]
-            if celdas:
-                filas.append(' | '.join(celdas))
-        bloque = '\n'.join(filas).strip()
-        table.replace_with(f'\n{bloque}\n' if bloque else '\n')
+    body = soup.body or soup
+    texto = body.get_text(separator='\n', strip=True)
+    lineas = []
+    titulo_norm = limpiar_texto(normalizar_texto_ocr(titulo or ''))
+    materia_norm = limpiar_texto(normalizar_texto_ocr(materia or ''))
 
-    texto = soup.get_text(separator='\n', strip=True)
-    lineas = [l.strip() for l in texto.split('\n') if l.strip()]
+    for raw in texto.splitlines():
+        linea = limpiar_texto(normalizar_texto_ocr(raw))
+        if es_linea_ruido_historico(linea):
+            continue
+        lineas.append(linea)
+
+    if titulo_norm:
+        lineas = [l for l in lineas if l != titulo_norm]
+    if materia_norm:
+        lineas = [l for l in lineas if l != f'MATERIA: {materia_norm}' and l != materia_norm]
+
+    lineas = deduplicar_lineas(lineas)
     texto_limpio = '\n'.join(lineas)
     texto_limpio = re.sub(r'\n{3,}', '\n\n', texto_limpio)
     texto_limpio = re.sub(r'[ \t]+', ' ', texto_limpio)
     return texto_limpio.strip()
-
 
 def leer_texto_archivo(path):
     for encoding in ('utf-8', 'utf-16', 'utf-16-le', 'utf-16-be', 'windows-1252', 'latin-1'):
@@ -393,116 +442,127 @@ def get_rapid_ocr():
 def normalizar_texto_ocr(texto):
     texto = reparar_mojibake(texto or '')
     texto = texto.replace('\r', '\n')
+    texto = texto.replace('\x0c', '\n')
     texto = re.sub(r'(\w)-\n(\w)', r'\1\2', texto)
     texto = re.sub(r'[ \t]+', ' ', texto)
     texto = re.sub(r' *\n *', '\n', texto)
     texto = re.sub(r'\n{3,}', '\n\n', texto)
-    texto = re.sub("\\bN[\\?QÃ‚Â¯Ã‚Â°Ã‚Âº]\\s*", lambda _m: "N" + chr(186) + " ", texto)
-    texto = re.sub("\\bA[\\?Ã¢â‚¬â€-]O\\b", lambda _m: "A" + chr(209) + "O", texto, flags=re.IGNORECASE)
-    texto = re.sub(r'\\bART[ÃƒÂ«Ãƒâ€¹]CULO(S?)\\b', lambda m: 'ART' + chr(205) + 'CULO' + (m.group(1) or ''), texto, flags=re.IGNORECASE)
-    texto = re.sub(r'\\bRESOLUCI[OÃƒâ€œ]N\\b', lambda _m: 'RESOLUCI' + chr(211) + 'N', texto, flags=re.IGNORECASE)
+
+    reemplazos = {
+        'N? ': 'N\u00ba ',
+        'N\u00af ': 'N\u00ba ',
+        'N\u00b0 ': 'N\u00ba ',
+        'A\u2014O': 'A\u00d1O',
+        'A?O': 'A\u00d1O',
+        'ART\u00ebCULO': 'ART\u00cdCULO',
+        'ARTICULO': 'ART\u00cdCULO',
+        'RESOLUCION': 'RESOLUCI\u00d3N',
+        'RESOLUCION N\u00ba': 'RESOLUCI\u00d3N N\u00ba',
+        'OBLIGACION': 'OBLIGACI\u00d3N',
+        'RETENCION': 'RETENCI\u00d3N',
+    }
+    for malo, bueno in reemplazos.items():
+        texto = texto.replace(malo, bueno)
+
+    texto = re.sub(r'\bN[?\u00af\u00b0\u00ba]\s*', 'N\u00ba ', texto)
+    texto = re.sub(r'AN[~\u2014?]O', 'A\u00d1O', texto, flags=re.IGNORECASE)
     return texto.strip()
 
 
 def puntuar_texto_ocr(texto):
-    limpio = limpiar_texto(normalizar_texto_ocr(texto))
-    if len(limpio) < 20:
-        return -1
-    palabras = re.findall(r'[A-Za-z0-9]{3,}', limpio)
-    ruido = len(re.findall(r'[ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¯ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¿ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â½]', limpio))
-    return len(limpio) + (len(palabras) * 12) - (ruido * 25)
+    texto = limpiar_texto(texto)
+    if not texto:
+        return 0
+    palabras = re.findall(r'[A-Za-z\u00c0-\u017f0-9]{3,}', texto)
+    lineas = [l for l in texto.splitlines() if limpiar_texto(l)]
+    score = len(palabras) * 4 + len(lineas)
+    score -= texto.count('?') * 2
+    score -= texto.count('\ufffd') * 4
+    return score
 
 
-def recortar_bordes_claros(imagen):
-    fondo = Image.new(imagen.mode, imagen.size, 255)
-    diff = ImageChops.difference(imagen, fondo)
-    bbox = diff.getbbox()
-    return imagen.crop(bbox) if bbox else imagen
-
-
-def preparar_variantes_para_ocr(image_path):
-    variantes = []
-    with Image.open(image_path) as img:
-        original = img.convert('L')
-        base = ImageOps.autocontrast(original.copy())
-        base = recortar_bordes_claros(base)
-        if base.width < 1400:
-            escala = 3
-        elif base.width < 2200:
-            escala = 2
-        else:
-            escala = 1
-        if escala > 1:
-            base = base.resize((base.width * escala, base.height * escala), Image.Resampling.LANCZOS)
-            original = original.resize((original.width * escala, original.height * escala), Image.Resampling.LANCZOS)
-
-        candidatos = [
-            ('orig', original),
-            ('gray', base),
-            ('sharp', base.filter(ImageFilter.SHARPEN)),
-            ('bw', base.point(lambda p: 255 if p > 185 else 0).convert('L')),
-            ('bw_light', base.point(lambda p: 255 if p > 145 else 0).convert('L')),
-            ('bw_dark', base.point(lambda p: 255 if p > 210 else 0).convert('L')),
-            ('bw_soft', base.filter(ImageFilter.MedianFilter(size=3)).point(lambda p: 255 if p > 165 else 0).convert('L')),
-            ('unsharp', base.filter(ImageFilter.UnsharpMask(radius=2, percent=180, threshold=3))),
-        ]
-
-        for nombre_variante, imagen in candidatos:
-            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f'_{nombre_variante}.png')
-            tmp.close()
-            imagen.save(tmp.name, format='PNG')
-            variantes.append((nombre_variante, tmp.name))
-
-    return variantes
-
-def encontrar_tesseract():
+def buscar_tesseract():
     candidatos = [
-        os.environ.get('TESSERACT_CMD'),
         shutil.which('tesseract'),
         r'C:\Program Files\Tesseract-OCR\tesseract.exe',
         r'C:\Program Files (x86)\Tesseract-OCR\tesseract.exe',
     ]
-    for candidato in candidatos:
-        if candidato and os.path.exists(candidato):
-            return candidato
+    for exe in candidatos:
+        if exe and os.path.exists(exe):
+            return exe
     return None
 
 
-def ocr_con_tesseract(image_path):
-    exe = encontrar_tesseract()
+def recortar_margenes(img):
+    fondo = Image.new(img.mode, img.size, 255)
+    diff = ImageChops.difference(img, fondo)
+    bbox = diff.getbbox()
+    if bbox:
+        return img.crop(bbox)
+    return img
+
+
+def preparar_variantes_para_ocr(image_path):
+    variantes = [('orig', image_path)]
+    temporales = []
+    try:
+        with Image.open(image_path) as img:
+            base = ImageOps.exif_transpose(img).convert('L')
+            base = recortar_margenes(base)
+            if base.width < 1600:
+                scale = max(2, int(1600 / max(base.width, 1)))
+                base = base.resize((base.width * scale, base.height * scale), Image.Resampling.LANCZOS)
+            auto = ImageOps.autocontrast(base)
+            sharpen = auto.filter(ImageFilter.SHARPEN)
+            bw = sharpen.point(lambda p: 255 if p > 180 else 0)
+
+            for nombre, imagen in (('gray', auto), ('sharp', sharpen), ('bw', bw)):
+                tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f'_{nombre}.png')
+                imagen.save(tmp.name, format='PNG')
+                tmp.close()
+                variantes.append((nombre, tmp.name))
+                temporales.append(tmp.name)
+    except Exception:
+        pass
+    return variantes
+
+
+def ocr_con_tesseract(image_path, lang='spa+eng', psm='6'):
+    exe = buscar_tesseract()
     if not exe:
         return None
 
-    configuraciones = [
-        ('spa+eng', '6'),
-        ('spa+eng', '4'),
-        ('spa+eng', '11'),
-        ('eng', '6'),
-    ]
     mejor_texto = None
     mejor_score = -1
     variantes = preparar_variantes_para_ocr(image_path)
+    umbral_corte = 350
     try:
-        for _, variante_path in variantes:
-            for lang, psm in configuraciones:
-                try:
-                    proc = subprocess.run(
-                        [exe, variante_path, 'stdout', '-l', lang, '--psm', psm, '-c', 'preserve_interword_spaces=1'],
-                        capture_output=True,
-                        timeout=180,
-                        check=False,
-                    )
-                    if proc.returncode != 0 or not proc.stdout:
-                        continue
-                    texto = proc.stdout.decode('utf-8', errors='ignore')
-                    score = puntuar_texto_ocr(texto)
-                    if score > mejor_score:
-                        mejor_score = score
-                        mejor_texto = texto
-                except Exception:
-                    continue
+        for nombre, variante_path in variantes:
+            try:
+                proc = subprocess.run(
+                    [exe, variante_path, 'stdout', '-l', lang, '--psm', psm, '-c', 'preserve_interword_spaces=1'],
+                    capture_output=True,
+                    text=True,
+                    encoding='utf-8',
+                    errors='replace',
+                    timeout=25,
+                    check=False,
+                )
+            except Exception:
+                continue
+            if proc.returncode != 0:
+                continue
+            texto = proc.stdout or ''
+            score = puntuar_texto_ocr(texto)
+            if score > mejor_score:
+                mejor_score = score
+                mejor_texto = texto
+            if mejor_score >= umbral_corte and nombre in ('orig', 'gray', 'sharp', 'bw'):
+                break
     finally:
-        for _, variante_path in variantes:
+        for nombre, variante_path in variantes:
+            if nombre == 'orig':
+                continue
             try:
                 os.remove(variante_path)
             except OSError:
@@ -513,7 +573,7 @@ def ocr_con_tesseract(image_path):
 
 def ocr_con_rapidocr(image_path):
     engine = get_rapid_ocr()
-    if not engine:
+    if engine is None:
         return None
 
     mejor_texto = None
@@ -537,14 +597,15 @@ def ocr_con_rapidocr(image_path):
             except Exception:
                 continue
     finally:
-        for _, variante_path in variantes:
+        for nombre, variante_path in variantes:
+            if nombre == 'orig':
+                continue
             try:
                 os.remove(variante_path)
             except OSError:
                 pass
 
     return normalizar_texto_ocr(mejor_texto) if mejor_texto else None
-
 
 def construir_pdf_desde_imagenes(image_paths, anio, nombre):
     imagenes = []
@@ -563,10 +624,57 @@ def construir_pdf_desde_imagenes(image_paths, anio, nombre):
     return os.path.relpath(pdf_path, BASE)
 
 
+
+def construir_pdf_desde_texto(texto, anio, nombre, titulo=''):
+    if not fitz:
+        return None
+
+    year_dir = ensure_year_dir(PDF_HIST_DIR, anio)
+    pdf_name = safe_name(f'circular_historica_{anio}_{nombre}_html.pdf')
+    pdf_path = os.path.join(year_dir, pdf_name)
+
+    bloques = []
+    if titulo:
+        bloques.append(titulo)
+        bloques.append('')
+
+    texto_base = (texto or '').replace('\r', '')
+    for bloque in re.split(r'\n{2,}', texto_base):
+        bloque = bloque.strip()
+        if not bloque:
+            continue
+        lineas = textwrap.wrap(bloque, width=95, break_long_words=False, replace_whitespace=False)
+        if lineas:
+            bloques.extend(lineas)
+        else:
+            bloques.append(bloque)
+        bloques.append('')
+
+    doc = fitz.open()
+    width, height = 595, 842
+    margin_x = 48
+    margin_y = 52
+    line_height = 13
+    y = margin_y
+    page = doc.new_page(width=width, height=height)
+
+    for idx, linea in enumerate(bloques):
+        if y > height - margin_y - line_height:
+            page = doc.new_page(width=width, height=height)
+            y = margin_y
+        fontsize = 12 if idx == 0 and titulo else 10
+        page.insert_text((margin_x, y), linea, fontsize=fontsize, fontname='helv')
+        y += line_height if linea else int(line_height * 0.7)
+
+    doc.save(pdf_path)
+    doc.close()
+    return os.path.relpath(pdf_path, BASE)
+
 def descubrir_paginas_escaneadas(current_url, html_text):
     soup = BeautifulSoup(html_text, 'lxml')
     current_base = os.path.splitext(os.path.basename(urlparse(current_url).path))[0]
-    root = raiz_documento(current_base)
+    prefijos = prefijos_documento(current_base)
+    sort_root = raiz_documento(current_base).lower()
     paginas = {current_url}
 
     for a in soup.find_all('a', href=True):
@@ -576,18 +684,33 @@ def descubrir_paginas_escaneadas(current_url, html_text):
         abs_url = urljoin(current_url, href)
         base = os.path.splitext(os.path.basename(urlparse(abs_url).path))[0]
         ext = os.path.splitext(os.path.basename(urlparse(abs_url).path))[1].lower()
+        base_lower = base.lower()
         if ext not in ('.htm', '.html'):
             continue
-        if re.match(rf'(?i)^{re.escape(root)}[a-z]?$', base):
+        if any(re.match(rf'(?i)^{re.escape(prefijo)}[a-z]?$', base_lower) for prefijo in prefijos):
             paginas.add(abs_url)
 
-    return sorted(paginas, key=lambda url: ordenar_pagina(url, root))
+    return sorted(paginas, key=lambda url: ordenar_pagina(url, sort_root))
+
+
+def prefijos_documento(base):
+    root = raiz_documento(base).lower()
+    prefijos = {root}
+    simple = re.sub(r'(?i)^circu0*', '', root)
+    if simple:
+        prefijos.add(simple)
+        prefijos.add(simple.lstrip('0') or simple)
+    solo_num = re.sub(r'(?i)^circu', '', root)
+    if solo_num:
+        prefijos.add(solo_num)
+        prefijos.add(solo_num.lstrip('0') or solo_num)
+    return {p for p in prefijos if p}
 
 
 def extraer_urls_imagenes(page_url, html_text):
     soup = BeautifulSoup(html_text, 'lxml')
     current_base = os.path.splitext(os.path.basename(urlparse(page_url).path))[0]
-    root = raiz_documento(current_base)
+    prefijos = prefijos_documento(current_base)
     imagenes = []
     vistos = set()
 
@@ -597,9 +720,10 @@ def extraer_urls_imagenes(page_url, html_text):
             continue
         abs_url = urljoin(page_url, src)
         base = os.path.basename(urlparse(abs_url).path)
+        stem = os.path.splitext(base)[0].lower()
         if not IMAGE_EXT_RE.search(base):
             continue
-        if not os.path.splitext(base)[0].lower().startswith(root.lower()):
+        if not any(stem.startswith(prefijo) for prefijo in prefijos):
             continue
         if abs_url in vistos:
             continue
@@ -616,27 +740,33 @@ def es_linea_mayuscula_util(linea):
     return (sum(1 for c in letras if c.isupper()) / len(letras)) >= 0.65
 
 
+
+def es_linea_mayuscula_util(linea):
+    letras = [c for c in linea if c.isalpha()]
+    if not letras:
+        return False
+    return (sum(1 for c in letras if c.isupper()) / len(letras)) >= 0.65
+
+
 def extraer_encabezado_escaneado(html_text, fallback_title=''):
     soup = BeautifulSoup(html_text, 'lxml')
+    titulo_meta, materia_meta = extraer_metadata_html(soup, fallback_title=fallback_title)
+
     candidatos = []
     for raw in soup.get_text('\n', strip=True).splitlines():
         linea = limpiar_texto(reparar_mojibake(raw))
-        if not linea:
-            continue
-        if linea.startswith('Home |'):
-            continue
-        if re.fullmatch(r'(?:\[\d+\],?\s*)+', linea):
+        if es_linea_ruido_historico(linea):
             continue
         candidatos.append(linea)
 
-    titulo = fallback_title or ''
-    materia = ''
+    titulo = titulo_meta or ''
+    materia = materia_meta or ''
     for idx, linea in enumerate(candidatos):
         upper = linea.upper()
         if not titulo and upper.startswith('CIRCULAR '):
-            titulo = linea
+            titulo = normalizar_texto_ocr(linea)
             continue
-        if 'MATERIA:' in upper:
+        if not materia and 'MATERIA:' in upper:
             partes = [linea]
             j = idx + 1
             while j < len(candidatos):
@@ -650,21 +780,23 @@ def extraer_encabezado_escaneado(html_text, fallback_title=''):
                     j += 1
                     continue
                 break
-            materia = ' '.join(partes)
+            materia = normalizar_texto_ocr(' '.join(partes))
             break
+
+    if materia.upper().startswith('MATERIA:'):
+        materia = limpiar_texto(materia.split(':', 1)[1])
 
     encabezado = []
     if titulo:
-        encabezado.append(normalizar_texto_ocr(titulo))
+        encabezado.append(titulo)
     if materia:
-        encabezado.append(normalizar_texto_ocr(materia))
+        encabezado.append(f'MATERIA: {materia}')
 
     return {
         'titulo_html': titulo or None,
         'materia_html': materia or None,
         'texto': '\n'.join(encabezado).strip(),
     }
-
 
 def guardar_salidas_ocr(nombre, anio, payload):
     year_dir = ensure_year_dir(OCR_DIR, anio)
@@ -692,21 +824,21 @@ def html_crudo_parece_scan(raw_bytes, url):
         return False
 
     current_base = os.path.splitext(os.path.basename(urlparse(url).path))[0]
-    root = raiz_documento(current_base).lower()
+    prefijos = prefijos_documento(current_base)
     html_lower = html_text.lower()
 
     if '<img' not in html_lower:
         return False
     if '.gif' not in html_lower and '.jpg' not in html_lower and '.png' not in html_lower and '.tif' not in html_lower:
         return False
-    if root not in html_lower and not re.search(r'\[\s*1\s*\].*\[\s*2\s*\]', html_text, re.IGNORECASE | re.DOTALL):
+    if not any(prefijo in html_lower for prefijo in prefijos) and not re.search(r'\\[\\s*1\\s*\\].*\\[\\s*2\\s*\\]', html_text, re.IGNORECASE | re.DOTALL):
         return False
     return True
 
 
 def contar_imagenes_documento(soup, page_url):
     current_base = os.path.splitext(os.path.basename(urlparse(page_url).path))[0]
-    root = raiz_documento(current_base)
+    prefijos = prefijos_documento(current_base)
     total = 0
 
     for img in soup.find_all('img', src=True):
@@ -717,7 +849,7 @@ def contar_imagenes_documento(soup, page_url):
         base = os.path.basename(urlparse(abs_url).path)
         if not IMAGE_EXT_RE.search(base):
             continue
-        if os.path.splitext(base)[0].lower().startswith(root.lower()):
+        if any(os.path.splitext(base)[0].lower().startswith(prefijo) for prefijo in prefijos):
             total += 1
 
     return total
@@ -738,7 +870,7 @@ def parece_html_escaneado(soup, page_url, texto_limpio):
     return False
 
 
-def procesar_html_ocr(raw_bytes, url, anio, nombre, fallback_title='', usar_ocr=False):
+def procesar_html_ocr(raw_bytes, url, anio, nombre, fallback_title='', usar_ocr=True):
     html_decodificado, encoding = decodificar_html(raw_bytes)
     html_original, html_limpio = guardar_htmls(nombre, anio, raw_bytes, html_decodificado)
     encabezado = extraer_encabezado_escaneado(html_decodificado, fallback_title=fallback_title)
@@ -779,6 +911,8 @@ def procesar_html_ocr(raw_bytes, url, anio, nombre, fallback_title='', usar_ocr=
         return {
             'texto': encabezado['texto'] or f'[DOCUMENTO ESCANEADO - SIN IMAGENES DESCARGADAS] Circular {nombre} de {anio}',
             'chars': len(limpiar_texto(encabezado['texto'] or '')),
+            'ocr_body': '',
+            'ocr_body_chars': 0,
             'ok': False,
             'pendiente_ocr': True,
             'raw_hash': hash_md5.hexdigest(),
@@ -796,6 +930,7 @@ def procesar_html_ocr(raw_bytes, url, anio, nombre, fallback_title='', usar_ocr=
     paginas_payload = []
     raw_parts = [encabezado['texto']] if encabezado['texto'] else []
     clean_parts = [encabezado['texto']] if encabezado['texto'] else []
+    body_parts = []
     paginas_con_ocr = 0
     backend_global = None
     body_chars = 0
@@ -816,7 +951,10 @@ def procesar_html_ocr(raw_bytes, url, anio, nombre, fallback_title='', usar_ocr=
         if texto_raw:
             paginas_con_ocr += 1
             texto_clean = normalizar_texto_ocr(texto_raw)
-            body_chars += len(limpiar_texto(texto_clean))
+            texto_clean = limpiar_texto(texto_clean)
+            if texto_clean:
+                body_parts.append(f'[PAGINA {idx}]\n{texto_clean}')
+            body_chars += len(texto_clean)
             raw_parts.append(f'[PAGINA {idx}]\n{texto_raw.strip()}')
             clean_parts.append(f'[PAGINA {idx}]\n{texto_clean.strip()}')
         else:
@@ -837,6 +975,7 @@ def procesar_html_ocr(raw_bytes, url, anio, nombre, fallback_title='', usar_ocr=
 
     full_raw = '\n\n'.join([p for p in raw_parts if p]).strip()
     full_clean = '\n\n'.join([p for p in clean_parts if p]).strip()
+    ocr_body = '\n\n'.join(body_parts).strip()
     ocr_payload = {
         'source_url': url,
         'document_id': safe_name(f'{anio}_{nombre}'),
@@ -851,15 +990,17 @@ def procesar_html_ocr(raw_bytes, url, anio, nombre, fallback_title='', usar_ocr=
     }
     ocr_raw_local, ocr_clean_local, ocr_json_local = guardar_salidas_ocr(nombre, anio, ocr_payload)
 
-    ok = (paginas_con_ocr > 0 and body_chars >= 120) if usar_ocr else True
+    ok = body_chars >= 250
     return {
         'texto': full_clean[:50000],
         'chars': len(limpiar_texto(full_clean)),
+        'ocr_body': ocr_body[:50000],
+        'ocr_body_chars': body_chars,
         'ok': ok,
-        'pendiente_ocr': (not ok) if usar_ocr else True,
+        'pendiente_ocr': not ok,
         'raw_hash': hash_md5.hexdigest(),
         'pdf_local': pdf_local,
-        'source_format': f'html_ocr_{backend_global}' if backend_global else ('html_ocr_pendiente' if usar_ocr else 'html_scan_metadata'),
+        'source_format': f'html_ocr_{backend_global}' if backend_global else 'html_ocr_pendiente',
         'url': url,
         'es_imagen': True,
         'titulo_html': encabezado['titulo_html'],
@@ -871,19 +1012,20 @@ def procesar_html_ocr(raw_bytes, url, anio, nombre, fallback_title='', usar_ocr=
         'ocr_json_local': ocr_json_local,
     }
 
-
 def procesar_html(raw_bytes, response, url, anio, nombre, fallback_title=''):
     html_decodificado, encoding = decodificar_html(raw_bytes)
     soup = BeautifulSoup(html_decodificado, 'lxml')
-    texto_limpio = extraer_texto_html(soup)
+    titulo_html, materia_html = extraer_metadata_html(soup, fallback_title=fallback_title)
+    texto_limpio = extraer_texto_html(soup, titulo=titulo_html, materia=materia_html)
     es_imagen = parece_html_escaneado(soup, url, texto_limpio)
 
     if es_imagen:
-        ocr_resultado = procesar_html_ocr(raw_bytes, url, anio, nombre, fallback_title=fallback_title)
+        ocr_resultado = procesar_html_ocr(raw_bytes, url, anio, nombre, fallback_title=fallback_title, usar_ocr=True)
         ocr_resultado['encoding_detectado'] = encoding
         return ocr_resultado
 
     html_original, html_limpio = guardar_htmls(nombre, anio, raw_bytes, html_decodificado)
+    pdf_local = construir_pdf_desde_texto(texto_limpio, anio, nombre, titulo=titulo_html or fallback_title or '')
     return {
         'texto': texto_limpio,
         'encoding_detectado': encoding,
@@ -891,12 +1033,14 @@ def procesar_html(raw_bytes, response, url, anio, nombre, fallback_title=''):
         'chars': len(texto_limpio),
         'html_original': html_original,
         'html_limpio': html_limpio,
-        'ok': len(texto_limpio) > 50,
+        'titulo_html': titulo_html or None,
+        'materia_html': materia_html or None,
+        'ok': len(texto_limpio) > 120,
         'raw_hash': hashlib.md5(raw_bytes).hexdigest(),
+        'pdf_local': pdf_local,
         'source_format': 'html',
         'url': url,
     }
-
 
 def procesar_pdf(pdf_bytes, url, anio, nombre):
     extraido = extraer_texto_pdf(pdf_bytes)
@@ -986,7 +1130,7 @@ def descargar_circular_historica(base_url, nombre_archivo, anio, fallback_title=
         if url.lower().endswith('.doc') or 'msword' in content_type or 'application/octet-stream' in content_type:
             return procesar_doc(response.content, url, anio, base)
         if html_crudo_parece_scan(response.content, url):
-            return procesar_html_ocr(response.content, url, anio, base, fallback_title=fallback_title)
+            return procesar_html_ocr(response.content, url, anio, base, fallback_title=fallback_title, usar_ocr=True)
         return procesar_html(response.content, response, url, anio, base, fallback_title=fallback_title)
 
     return None
@@ -1004,21 +1148,31 @@ def construir_doc_data(item, resultado):
     if materia.upper().startswith('MATERIA:'):
         materia = limpiar_texto(materia.split(':', 1)[1])
 
+    bloques = [titulo]
+    if materia:
+        bloques.append(f'MATERIA: {materia}')
+
     if resultado.get('es_imagen'):
-        bloques = [titulo]
-        if materia:
-            bloques.append(f'MATERIA: {materia}')
+        ocr_body = re.sub(r'[ \t]+', ' ', (resultado.get('ocr_body') or '')).strip()
         bloques.append('[DOCUMENTO ESCANEADO DEL SII]')
-        bloques.append('Se conserva el encabezado limpio y el PDF escaneado. El OCR queda como apoyo auxiliar y no se indexa como contenido principal.')
+        if ocr_body:
+            bloques.append('[OCR AUXILIAR NO REVISADO]')
+            bloques.append(ocr_body)
+            contenido_indexable = '\n\n'.join(b for b in bloques if b)
+        else:
+            bloques.append('Se conserva el encabezado limpio y el PDF escaneado. El OCR queda como apoyo auxiliar y no se indexa como contenido principal.')
+            contenido_indexable = '\n\n'.join(b for b in bloques if b)
+        fecha = extraer_fecha_texto(contenido_indexable) or f'{anio}-01-01'
+        leyes = detectar_leyes(ocr_body) if ocr_body else []
+        articulos = detectar_articulos(ocr_body) if ocr_body else []
+    else:
+        cuerpo = re.sub(r'[ \t]+', ' ', (texto or '')).strip()
+        if cuerpo:
+            bloques.append(cuerpo)
         contenido_indexable = '\n\n'.join(b for b in bloques if b)
         fecha = extraer_fecha_texto(contenido_indexable) or f'{anio}-01-01'
-        leyes = []
-        articulos = []
-    else:
-        contenido_indexable = texto[:50000]
-        fecha = extraer_fecha_texto(texto) or f'{anio}-01-01'
-        leyes = detectar_leyes(texto)
-        articulos = detectar_articulos(texto)
+        leyes = detectar_leyes(cuerpo)
+        articulos = detectar_articulos(cuerpo)
 
     resumen = extraer_resumen(contenido_indexable)
 
@@ -1088,6 +1242,8 @@ def procesar_item(item, delay=0.8):
     if resultado.get('es_imagen'):
         if resultado.get('pendiente_ocr'):
             estado = 'ok_scan_metadata_pendiente_ocr'
+        elif resultado.get('ocr_body_chars', 0) >= 250:
+            estado = 'ok_scan_ocr_auxiliar'
         else:
             estado = 'ok_scan_metadata'
     elif resultado.get('pendiente_ocr'):
@@ -1161,3 +1317,4 @@ if __name__ == '__main__':
     print(f'TOTAL indices/documentos vistos: {total}')
     print(f'NUEVOS: {nuevos}')
     print(f'ERRORES/WARN: {errores}')
+

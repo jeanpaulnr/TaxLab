@@ -1,0 +1,27 @@
+{
+  "db_path": "data\\sii_normativa.db",
+  "pdf_root": "pdfs",
+  "html_root": "html_historico",
+  "img_root": "img_historico",
+  "ocr_root": "ocr_historico",
+  "doc_root": "doc_historico",
+  "total_documentos_bd": 9956,
+  "total_pdfs_en_disco": 9943,
+  "total_con_pdf_valido": 9943,
+  "total_sin_pdf": 13,
+  "total_con_html_sin_pdf": 13,
+  "total_con_imagen_sin_pdf": 0,
+  "total_con_ocr_sin_pdf": 0,
+  "total_con_doc_sin_pdf": 0,
+  "total_sin_fuente_recuperable": 0,
+  "total_pdf_huerfano": 0,
+  "total_pdf_duplicado": 0,
+  "total_inconsistencia": 0,
+  "porcentaje_paridad_actual": 99.87,
+  "matching_strategy": {
+    "principal": "tipo+anio+numero",
+    "judicial": "judicial_docs.pdf_local y fallback sii_id",
+    "historico": "stems por anio/numero/titulo sobre html/img/ocr/doc",
+    "regla": "No se asocian coincidencias ambiguas como OK_PDF."
+  }
+}

@@ -1,4 +1,4 @@
-"""
+﻿"""
 SII Normativa — Descargador de Resoluciones Exentas
 ====================================================
 Como no hay índice HTML público, probamos URLs directas:
@@ -23,6 +23,7 @@ from engine import (
     guardar_documento, log_scraper, log, PDF_DIR
 )
 import hashlib, json
+from pdf_layout import build_pdf_path
 
 SII_BASE = "https://www.sii.cl/normativa_legislacion"
 
@@ -66,7 +67,7 @@ def descargar_resoluciones(anio, max_num=300, delay=0.5):
         consecutivos_404 = 0
         
         # Guardar PDF en disco
-        pdf_path = os.path.join(PDF_DIR, f"resolucion_{anio}_{numero.zfill(4)}.pdf")
+        pdf_path = build_pdf_path("resolucion", anio, f"resolucion_{anio}_{numero.zfill(4)}.pdf")
         try:
             with open(pdf_path, 'wb') as f:
                 f.write(pdf_bytes)
@@ -169,3 +170,4 @@ if __name__ == '__main__':
     print("\n" + "="*60)
     print(f"  TOTAL: {total_nuevos} resoluciones nuevas descargadas")
     print("="*60)
+

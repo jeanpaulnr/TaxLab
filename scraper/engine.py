@@ -1,4 +1,4 @@
-"""
+﻿"""
 SII Normativa — Motor de Scraping v2.1
 =======================================
 ARQUITECTURA CORRECTA (verificada con HTML fuente del SII):
@@ -22,6 +22,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime, date
 from urllib.parse import urljoin
 import fitz  # PyMuPDF
+from pdf_layout import build_pdf_path
 
 BASE    = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.path.join(BASE, 'data', 'sii_normativa.db')
@@ -581,7 +582,7 @@ def descargar_pdf(url, retries=3, delay=1.0):
 def _procesar_y_guardar(pdf_bytes, tipo_norm, tipo_clave, numero, anio,
                          doc_info, url_ref, callback, i, total):
     # Guardar en disco
-    pdf_path = os.path.join(PDF_DIR, f"{tipo_norm}_{anio}_{numero.zfill(4)}.pdf")
+    pdf_path = build_pdf_path(tipo_norm, anio, f"{tipo_norm}_{anio}_{numero.zfill(4)}.pdf")
     try:
         with open(pdf_path, 'wb') as f: f.write(pdf_bytes)
     except: pass
