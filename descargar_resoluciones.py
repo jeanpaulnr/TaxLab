@@ -111,13 +111,17 @@ def descargar_resoluciones(anio, max_num=300, delay=0.5):
             'titulo': titulo[:500],
             'materia': None,
             'subtema': '',
-            'contenido': texto[:50000],
+            'contenido': texto,
             'resumen': resumen,
             'url_sii': url,
             'referencia': f"Resolución Ex. SII N°{numero} de {anio}",
             'palabras_clave': None,
             'leyes_citadas': json.dumps(leyes),
             'articulos_clave': json.dumps(arts[:20]),
+            'paginas': ext['paginas'],
+            'chars_texto': ext['chars'],
+            'pdf_local': os.path.relpath(pdf_path, BASE).replace('\\', '/'),
+            'pdf_size_bytes': len(pdf_bytes),
             'fuente': 'scraper',
         }
         
@@ -125,17 +129,17 @@ def descargar_resoluciones(anio, max_num=300, delay=0.5):
         if doc_id:
             nuevos += 1
             log_scraper('resolucion', anio, numero, 'ok', url)
-            print(f"  ✅ [{num}/{max_num}] Res. Ex. N°{numero}/{anio} — {ext['paginas']} págs, {len(leyes)} leyes")
+            print(f"  OK [{num}/{max_num}] Res. Ex. N°{numero}/{anio} — {ext['paginas']} págs, {len(leyes)} leyes")
         else:
             errores += 1
         
         time.sleep(delay)
     
     print(f"\n  RESULTADO {anio}:")
-    print(f"  ✅ Nuevas:       {nuevos}")
+    print(f"  Nuevas:          {nuevos}")
     print(f"  ⏭  Ya existían:  {existentes}")
     print(f"  ❌ No encontradas: {no_encontrados}")
-    print(f"  ⚠  Errores:      {errores}")
+    print(f"  Errores:         {errores}")
     
     return {'anio': anio, 'nuevos': nuevos, 'existentes': existentes, 
             'no_encontrados': no_encontrados, 'errores': errores}
@@ -170,4 +174,5 @@ if __name__ == '__main__':
     print("\n" + "="*60)
     print(f"  TOTAL: {total_nuevos} resoluciones nuevas descargadas")
     print("="*60)
+
 

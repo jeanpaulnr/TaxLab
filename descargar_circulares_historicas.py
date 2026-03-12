@@ -228,7 +228,7 @@ def guardar_htmls(nombre, anio, raw_bytes, html_limpio):
         f.write(raw_bytes)
     with open(limpio, 'w', encoding='utf-8') as f:
         f.write(html_limpio)
-    return os.path.relpath(original, BASE), os.path.relpath(limpio, BASE)
+    return normalizar_relpath_archivo(original), normalizar_relpath_archivo(limpio)
 
 
 def guardar_doc(nombre, anio, raw_bytes):
@@ -237,7 +237,7 @@ def guardar_doc(nombre, anio, raw_bytes):
     path = os.path.join(year_dir, f'{stem}.doc')
     with open(path, 'wb') as f:
         f.write(raw_bytes)
-    return path, os.path.relpath(path, BASE)
+    return path, normalizar_relpath_archivo(path)
 
 
 def guardar_imagen(nombre, anio, idx, img_url, raw_bytes):
@@ -247,12 +247,14 @@ def guardar_imagen(nombre, anio, idx, img_url, raw_bytes):
     path = os.path.join(year_dir, f'{stem}{ext}')
     with open(path, 'wb') as f:
         f.write(raw_bytes)
-    return path, os.path.relpath(path, BASE)
+    return path, normalizar_relpath_archivo(path)
 
 
 def es_linea_ruido_historico(linea):
     linea = limpiar_texto(linea)
     if not linea:
+        return True
+    if linea in {'Home', '|', 'Inicio'}:
         return True
     if linea.startswith('Home |'):
         return True
@@ -621,8 +623,151 @@ def construir_pdf_desde_imagenes(image_paths, anio, nombre):
     pdf_path = os.path.join(year_dir, pdf_name)
     primera, resto = imagenes[0], imagenes[1:]
     primera.save(pdf_path, save_all=True, append_images=resto)
-    return os.path.relpath(pdf_path, BASE)
+    return normalizar_relpath_archivo(pdf_path)
 
+
+
+def buscar_navegador_headless():
+    candidatos = [
+        shutil.which('msedge'),
+        shutil.which('msedge.exe'),
+        shutil.which('chrome'),
+        shutil.which('chrome.exe'),
+        r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe',
+        r'C:\Program Files\Microsoft\Edge\Application\msedge.exe',
+        r'C:\Program Files\Google\Chrome\Application\chrome.exe',
+        r'C:\Program Files (x86)\Google\Chrome\Application\chrome.exe',
+    ]
+    for exe in candidatos:
+        if exe and os.path.exists(exe):
+            return exe
+    return None
+
+
+def construir_pdf_desde_html_render(url, anio, nombre):
+    navegador = buscar_navegador_headless()
+    if not navegador:
+        return None
+
+    year_dir = ensure_year_dir(PDF_HIST_DIR, anio)
+    pdf_name = safe_name(f'circular_historica_{anio}_{nombre}_html.pdf')
+    pdf_path = os.path.join(year_dir, pdf_name)
+    if os.path.exists(pdf_path):
+        try:
+            os.remove(pdf_path)
+        except OSError:
+            pass
+
+    try:
+        proc = subprocess.run(
+            [
+                navegador,
+                '--headless',
+                '--disable-gpu',
+                '--no-pdf-header-footer',
+                '--virtual-time-budget=5000',
+                f'--print-to-pdf={pdf_path}',
+                url,
+            ],
+            capture_output=True,
+            timeout=45,
+            check=False,
+        )
+        if proc.returncode != 0:
+            return None
+        if not os.path.exists(pdf_path):
+            return None
+        if os.path.getsize(pdf_path) <= 1024:
+            return None
+        return normalizar_relpath_archivo(pdf_path)
+    except Exception:
+        return None
+
+
+def construir_pdf_desde_html_local(html_text, base_url, anio, nombre):
+    navegador = buscar_navegador_headless()
+    if not navegador:
+        return None
+
+    year_dir = ensure_year_dir(PDF_HIST_DIR, anio)
+    html_year_dir = ensure_year_dir(HTML_DIR, anio)
+    pdf_name = safe_name(f'circular_historica_{anio}_{nombre}_html.pdf')
+    pdf_path = os.path.join(year_dir, pdf_name)
+    tmp_html = os.path.join(html_year_dir, safe_name(f'{anio}_{nombre}_render.html'))
+
+    soup = BeautifulSoup(html_text, 'lxml')
+    for comentario in soup.find_all(string=lambda t: isinstance(t, Comment)):
+        comentario.extract()
+    for tag in soup.find_all(['script', 'style']):
+        tag.decompose()
+
+    for a in list(soup.find_all('a')):
+        if not getattr(a, 'attrs', None):
+            continue
+        href = (a.get('href') or '').strip()
+        text = limpiar_texto(a.get_text(' ', strip=True))
+        if href == 'https://www.sii.cl/' or text.lower() == 'home':
+            parent = a.parent
+            if parent and parent.name in {'p', 'div', 'td', 'font'}:
+                parent.decompose()
+            else:
+                a.decompose()
+
+    body = soup.body or soup
+    wrapped = f"""<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <base href="{base_url}">
+  <style>
+    body {{ font-family: Arial, Helvetica, sans-serif; margin: 28px 36px; color: #111; }}
+    table {{ width: 100% !important; }}
+    img {{ max-width: 100%; height: auto; }}
+  </style>
+</head>
+<body>
+{body.decode_contents()}
+</body>
+</html>"""
+
+    with open(tmp_html, 'w', encoding='utf-8') as f:
+        f.write(wrapped)
+
+    try:
+        if os.path.exists(pdf_path):
+            os.remove(pdf_path)
+    except OSError:
+        pass
+
+    try:
+        proc = subprocess.run(
+            [
+                navegador,
+                '--headless',
+                '--disable-gpu',
+                '--allow-file-access-from-files',
+                '--no-pdf-header-footer',
+                '--virtual-time-budget=5000',
+                f'--print-to-pdf={pdf_path}',
+                f'file:///{tmp_html.replace(os.sep, "/")}',
+            ],
+            capture_output=True,
+            timeout=45,
+            check=False,
+        )
+        if proc.returncode != 0:
+            return None
+        if not os.path.exists(pdf_path) or os.path.getsize(pdf_path) <= 1024:
+            return None
+        return normalizar_relpath_archivo(pdf_path)
+    except Exception:
+        return None
+    finally:
+        try:
+            if os.path.exists(tmp_html):
+                os.remove(tmp_html)
+        except OSError:
+            pass
 
 
 def construir_pdf_desde_texto(texto, anio, nombre, titulo=''):
@@ -668,7 +813,28 @@ def construir_pdf_desde_texto(texto, anio, nombre, titulo=''):
 
     doc.save(pdf_path)
     doc.close()
-    return os.path.relpath(pdf_path, BASE)
+    return normalizar_relpath_archivo(pdf_path)
+
+
+def normalizar_relpath_archivo(path):
+    return os.path.relpath(path, BASE).replace('\\', '/')
+
+
+def medir_pdf_local(pdf_local):
+    if not pdf_local:
+        return 0, 0
+    abs_path = os.path.join(BASE, pdf_local.replace('/', os.sep))
+    if not os.path.exists(abs_path):
+        return 0, 0
+    size_bytes = os.path.getsize(abs_path)
+    paginas = 0
+    if fitz:
+        try:
+            with fitz.open(abs_path) as doc:
+                paginas = doc.page_count
+        except Exception:
+            paginas = 0
+    return paginas, size_bytes
 
 def descubrir_paginas_escaneadas(current_url, html_text):
     soup = BeautifulSoup(html_text, 'lxml')
@@ -926,6 +1092,7 @@ def procesar_html_ocr(raw_bytes, url, anio, nombre, fallback_title='', usar_ocr=
         }
 
     pdf_local = construir_pdf_desde_imagenes([img['path'] for img in imagenes], anio, nombre)
+    pdf_paginas, pdf_size_bytes = medir_pdf_local(pdf_local)
 
     paginas_payload = []
     raw_parts = [encabezado['texto']] if encabezado['texto'] else []
@@ -992,14 +1159,16 @@ def procesar_html_ocr(raw_bytes, url, anio, nombre, fallback_title='', usar_ocr=
 
     ok = body_chars >= 250
     return {
-        'texto': full_clean[:50000],
+        'texto': full_clean,
         'chars': len(limpiar_texto(full_clean)),
-        'ocr_body': ocr_body[:50000],
+        'ocr_body': ocr_body,
         'ocr_body_chars': body_chars,
         'ok': ok,
         'pendiente_ocr': not ok,
         'raw_hash': hash_md5.hexdigest(),
+        'paginas': pdf_paginas or len(imagenes),
         'pdf_local': pdf_local,
+        'pdf_size_bytes': pdf_size_bytes,
         'source_format': f'html_ocr_{backend_global}' if backend_global else 'html_ocr_pendiente',
         'url': url,
         'es_imagen': True,
@@ -1025,7 +1194,17 @@ def procesar_html(raw_bytes, response, url, anio, nombre, fallback_title=''):
         return ocr_resultado
 
     html_original, html_limpio = guardar_htmls(nombre, anio, raw_bytes, html_decodificado)
-    pdf_local = construir_pdf_desde_texto(texto_limpio, anio, nombre, titulo=titulo_html or fallback_title or '')
+    pdf_local = construir_pdf_desde_html_local(html_decodificado, url, anio, nombre)
+    if not pdf_local:
+        pdf_local = construir_pdf_desde_html_render(url, anio, nombre)
+    if not pdf_local:
+        pdf_local = construir_pdf_desde_texto(
+            texto_limpio,
+            anio,
+            nombre,
+            titulo=titulo_html or fallback_title or '',
+        )
+    pdf_paginas, pdf_size_bytes = medir_pdf_local(pdf_local)
     return {
         'texto': texto_limpio,
         'encoding_detectado': encoding,
@@ -1036,8 +1215,10 @@ def procesar_html(raw_bytes, response, url, anio, nombre, fallback_title=''):
         'titulo_html': titulo_html or None,
         'materia_html': materia_html or None,
         'ok': len(texto_limpio) > 120,
+        'paginas': pdf_paginas,
         'raw_hash': hashlib.md5(raw_bytes).hexdigest(),
         'pdf_local': pdf_local,
+        'pdf_size_bytes': pdf_size_bytes,
         'source_format': 'html',
         'url': url,
     }
@@ -1059,7 +1240,8 @@ def procesar_pdf(pdf_bytes, url, anio, nombre):
         'paginas': extraido['paginas'],
         'ok': True,
         'raw_hash': hashlib.md5(pdf_bytes).hexdigest(),
-        'pdf_local': os.path.relpath(pdf_path, BASE),
+        'pdf_local': normalizar_relpath_archivo(pdf_path),
+        'pdf_size_bytes': len(pdf_bytes),
         'source_format': 'pdf',
         'url': url,
         'es_imagen': False,
@@ -1081,12 +1263,17 @@ def procesar_doc(doc_bytes, url, anio, nombre):
         texto = limpiar_texto(texto)
         if len(texto) < 50:
             continue
+        pdf_local = construir_pdf_desde_texto(texto, anio, nombre, titulo='')
+        pdf_paginas, pdf_size_bytes = medir_pdf_local(pdf_local)
         return {
-            'texto': texto[:50000],
+            'texto': texto,
             'chars': len(texto),
+            'paginas': pdf_paginas,
             'ok': True,
             'raw_hash': hashlib.md5(doc_bytes).hexdigest(),
             'doc_local': doc_rel,
+            'pdf_local': pdf_local,
+            'pdf_size_bytes': pdf_size_bytes,
             'source_format': metodo,
             'url': url,
             'es_imagen': False,
@@ -1153,18 +1340,12 @@ def construir_doc_data(item, resultado):
         bloques.append(f'MATERIA: {materia}')
 
     if resultado.get('es_imagen'):
-        ocr_body = re.sub(r'[ \t]+', ' ', (resultado.get('ocr_body') or '')).strip()
         bloques.append('[DOCUMENTO ESCANEADO DEL SII]')
-        if ocr_body:
-            bloques.append('[OCR AUXILIAR NO REVISADO]')
-            bloques.append(ocr_body)
-            contenido_indexable = '\n\n'.join(b for b in bloques if b)
-        else:
-            bloques.append('Se conserva el encabezado limpio y el PDF escaneado. El OCR queda como apoyo auxiliar y no se indexa como contenido principal.')
-            contenido_indexable = '\n\n'.join(b for b in bloques if b)
+        bloques.append('Se conserva el encabezado limpio y el PDF escaneado. El OCR queda como apoyo auxiliar y no se indexa como contenido principal.')
+        contenido_indexable = '\n\n'.join(b for b in bloques if b)
         fecha = extraer_fecha_texto(contenido_indexable) or f'{anio}-01-01'
-        leyes = detectar_leyes(ocr_body) if ocr_body else []
-        articulos = detectar_articulos(ocr_body) if ocr_body else []
+        leyes = []
+        articulos = []
     else:
         cuerpo = re.sub(r'[ \t]+', ' ', (texto or '')).strip()
         if cuerpo:
@@ -1175,12 +1356,15 @@ def construir_doc_data(item, resultado):
         articulos = detectar_articulos(cuerpo)
 
     resumen = extraer_resumen(contenido_indexable)
+    chars_guardados = len(contenido_indexable or '')
 
     palabras = []
     if resultado.get('es_imagen'):
         palabras.append('documento_escaneado')
         palabras.append('ocr_auxiliar')
-    if resultado.get('source_format', '').startswith('html_ocr_'):
+    if resultado.get('es_imagen') and resultado.get('source_format'):
+        palabras.append(resultado.get('source_format'))
+    elif resultado.get('source_format', '').startswith('html_ocr_'):
         palabras.append('ocr_extraido')
         palabras.append(resultado.get('source_format'))
     palabras_clave = ','.join(palabras) if palabras else None
@@ -1201,6 +1385,10 @@ def construir_doc_data(item, resultado):
         'palabras_clave': palabras_clave,
         'leyes_citadas': json.dumps(leyes),
         'articulos_clave': json.dumps(articulos[:20]),
+        'paginas': resultado.get('paginas', 0),
+        'chars_texto': chars_guardados,
+        'pdf_local': resultado.get('pdf_local'),
+        'pdf_size_bytes': resultado.get('pdf_size_bytes', 0),
         'fuente': 'scraper_historico',
     }
 

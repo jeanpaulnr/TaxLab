@@ -292,29 +292,131 @@ def extraer_resumen(texto, max_chars=800):
     return r[:max_chars]
 
 # ── BD guardar ────────────────────────────────────────────────────────────
+def _json_list(value):
+    if not value:
+        return []
+    if isinstance(value, list):
+        return value
+    try:
+        parsed = json.loads(value)
+        return parsed if isinstance(parsed, list) else []
+    except Exception:
+        return []
+
+
+def _indexar_articulos_conservador(conn, doc_id, leyes, articulos):
+    leyes = [ley for ley in leyes if ley]
+    articulos = [art for art in articulos if art][:20]
+    conn.execute("DELETE FROM articulos_idx WHERE doc_id=?", (doc_id,))
+    vistos = set()
+
+    if len(leyes) == 1:
+        ley = leyes[0]
+        if articulos:
+            for articulo in articulos:
+                key = (ley, articulo)
+                if key in vistos:
+                    continue
+                conn.execute(
+                    "INSERT OR IGNORE INTO articulos_idx(doc_id, ley, articulo) VALUES(?,?,?)",
+                    (doc_id, ley, articulo),
+                )
+                vistos.add(key)
+        else:
+            conn.execute(
+                "INSERT OR IGNORE INTO articulos_idx(doc_id, ley, articulo) VALUES(?,?,NULL)",
+                (doc_id, ley),
+            )
+        return
+
+    for ley in leyes:
+        key = (ley, None)
+        if key in vistos:
+            continue
+        conn.execute(
+            "INSERT OR IGNORE INTO articulos_idx(doc_id, ley, articulo) VALUES(?,?,NULL)",
+            (doc_id, ley),
+        )
+        vistos.add(key)
+
+    for articulo in articulos:
+        key = (None, articulo)
+        if key in vistos:
+            continue
+        conn.execute(
+            "INSERT OR IGNORE INTO articulos_idx(doc_id, ley, articulo) VALUES(?,NULL,?)",
+            (doc_id, articulo),
+        )
+        vistos.add(key)
+
 def guardar_documento(data):
+    payload = dict(data)
+    payload.setdefault('paginas', 0)
+    payload.setdefault('chars_texto', len(payload.get('contenido') or ''))
+    payload.setdefault('pdf_local', None)
+    payload.setdefault('pdf_size_bytes', 0)
+    payload.setdefault('fuente', 'scraper')
+
+    if not (payload.get('contenido') or '').strip():
+        log.warning('Documento sin contenido util: %s/%s/%s', payload.get('tipo'), payload.get('anio'), payload.get('numero'))
+        return None
+
     conn = get_db()
     try:
+        same_identity = conn.execute(
+            "SELECT id, hash_md5 FROM documentos WHERE tipo=? AND numero=? AND anio=?",
+            (payload.get('tipo'), payload.get('numero'), payload.get('anio')),
+        ).fetchone()
+        if same_identity and same_identity['hash_md5'] != payload['hash_md5']:
+            log.warning(
+                "Identidad documental existente con hash distinto; se actualiza: %s/%s/%s",
+                payload.get('tipo'), payload.get('anio'), payload.get('numero')
+            )
+            payload['id'] = same_identity['id']
+            conn.execute('''UPDATE documentos SET
+                hash_md5=:hash_md5, fecha=:fecha, titulo=:titulo, materia=:materia, subtema=:subtema,
+                contenido=:contenido, resumen=:resumen, url_sii=:url_sii, referencia=:referencia,
+                palabras_clave=:palabras_clave, leyes_citadas=:leyes_citadas, articulos_clave=:articulos_clave,
+                paginas=:paginas, chars_texto=:chars_texto, pdf_local=:pdf_local, pdf_size_bytes=:pdf_size_bytes,
+                fuente=:fuente, fecha_carga=datetime('now')
+                WHERE id=:id''', payload)
+            doc_id = same_identity['id']
+            _indexar_articulos_conservador(
+                conn,
+                doc_id,
+                _json_list(payload.get('leyes_citadas')),
+                _json_list(payload.get('articulos_clave')),
+            )
+            conn.commit()
+            return doc_id
+
         conn.execute('''INSERT OR IGNORE INTO documentos
             (hash_md5, tipo, numero, anio, fecha, titulo, materia, subtema,
              contenido, resumen, url_sii, referencia, palabras_clave,
-             leyes_citadas, articulos_clave, fuente)
+             leyes_citadas, articulos_clave, paginas, chars_texto,
+             pdf_local, pdf_size_bytes, fuente)
             VALUES
             (:hash_md5, :tipo, :numero, :anio, :fecha, :titulo, :materia, :subtema,
              :contenido, :resumen, :url_sii, :referencia, :palabras_clave,
-             :leyes_citadas, :articulos_clave, :fuente)''', data)
-        row = conn.execute("SELECT id FROM documentos WHERE hash_md5=?", (data['hash_md5'],)).fetchone()
+             :leyes_citadas, :articulos_clave, :paginas, :chars_texto,
+             :pdf_local, :pdf_size_bytes, :fuente)''', payload)
+        row = conn.execute("SELECT id FROM documentos WHERE hash_md5=?", (payload['hash_md5'],)).fetchone()
         doc_id = row['id'] if row else None
         if doc_id:
-            for ley in json.loads(data.get('leyes_citadas','[]')):
-                for art in json.loads(data.get('articulos_clave','[]'))[:20]:
-                    try: conn.execute("INSERT OR IGNORE INTO articulos_idx(doc_id,ley,articulo) VALUES(?,?,?)",(doc_id,ley,art))
-                    except: pass
+            _indexar_articulos_conservador(
+                conn,
+                doc_id,
+                _json_list(payload.get('leyes_citadas')),
+                _json_list(payload.get('articulos_clave')),
+            )
         conn.commit()
         return doc_id
     except Exception as e:
-        log.error(f"Error BD: {e}"); return None
-    finally: conn.close()
+        log.error(f"Error BD: {e}")
+        return None
+    finally:
+        conn.close()
+
 
 def log_scraper(tipo, anio, numero, estado, url):
     conn = get_db()
@@ -617,19 +719,33 @@ def _procesar_y_guardar(pdf_bytes, tipo_norm, tipo_clave, numero, anio,
         subtema = doc_info.get('descripcion','')[:200]
 
     doc_data = {
-        'hash_md5': hash_doc, 'tipo': tipo_norm, 'numero': numero, 'anio': anio,
-        'fecha': fecha, 'titulo': titulo[:500], 'materia': None,
-        'subtema': (subtema or '')[:300], 'contenido': texto[:50000],
-        'resumen': resumen, 'url_sii': url_ref, 'referencia': referencia,
-        'palabras_clave': None, 'leyes_citadas': json.dumps(leyes),
-        'articulos_clave': json.dumps(arts[:20]), 'fuente': 'scraper',
+        'hash_md5': hash_doc,
+        'tipo': tipo_norm,
+        'numero': numero,
+        'anio': anio,
+        'fecha': fecha,
+        'titulo': titulo[:500],
+        'materia': None,
+        'subtema': (subtema or '')[:300],
+        'contenido': texto,
+        'resumen': resumen,
+        'url_sii': url_ref,
+        'referencia': referencia,
+        'palabras_clave': None,
+        'leyes_citadas': json.dumps(leyes),
+        'articulos_clave': json.dumps(arts[:20]),
+        'paginas': ext['paginas'],
+        'chars_texto': ext['chars'],
+        'pdf_local': os.path.relpath(pdf_path, BASE).replace('\\', '/'),
+        'pdf_size_bytes': len(pdf_bytes),
+        'fuente': 'scraper',
     }
 
     doc_id = guardar_documento(doc_data)
     if doc_id:
         log_scraper(tipo_clave, anio, numero, 'ok', url_ref)
-        log.info(f"  ✅ [{i+1}/{total}] {referencia} — {ext['paginas']} págs")
-        if callback: callback(f"✅ [{i+1}/{total}] {referencia} ({ext['paginas']} págs)", True, total)
+        log.info(f"  OK [{i+1}/{total}] {referencia} — {ext['paginas']} págs")
+        if callback: callback(f"OK [{i+1}/{total}] {referencia} ({ext['paginas']} págs)", True, total)
         return True, True
     else:
         log_scraper(tipo_clave, anio, numero, 'error_bd', url_ref)
@@ -654,7 +770,7 @@ def scrape_anio(tipo_clave, anio, callback=None, delay=0.8):
             if callback: callback(msg, False, 0)
             return {'ok': False, 'tipo': tipo_clave, 'anio': anio, 'total': 0, 'nuevos': 0, 'saltados': 0, 'errores': 0}
 
-        if callback: callback(f"🔍 API SII: key={api_key}, year={anio}...", True, 0)
+        if callback: callback(f"API SII: key={api_key}, year={anio}...", True, 0)
         items = obtener_oficios_api(api_key, anio)
 
         if not items:
@@ -665,7 +781,7 @@ def scrape_anio(tipo_clave, anio, callback=None, delay=0.8):
 
         total = len(items)
         nuevos = errores = saltados = 0
-        if callback: callback(f"📋 {api_key}/{anio}: {total} oficios", True, total)
+        if callback: callback(f"LISTA {api_key}/{anio}: {total} oficios", True, total)
 
         for i, item in enumerate(items):
             numero    = str(item.get('pubNumOficio', '')).strip()
@@ -695,7 +811,7 @@ def scrape_anio(tipo_clave, anio, callback=None, delay=0.8):
             if pdf_bytes is None:
                 errores += 1
                 log_scraper(tipo_clave, anio, numero, 'blob_fallido', url_ref)
-                if callback: callback(f"⚠ [{i+1}/{total}] Oficio N°{numero}/{anio} — descarga fallida", False, total)
+                if callback: callback(f"WARN [{i+1}/{total}] Oficio N°{numero}/{anio} - descarga fallida", False, total)
                 time.sleep(delay * 0.5)
                 continue
 
@@ -753,7 +869,7 @@ def scrape_anio(tipo_clave, anio, callback=None, delay=0.8):
     docs = parsear_indice_circulares(html, anio, url_indice) if tipo_clave == 'circular' else parsear_indice_resoluciones(html, anio)
     total = len(docs)
     log.info(f"  {total} documentos en índice")
-    if callback: callback(f"📋 {total} documentos en índice {anio}", True, total)
+    if callback: callback(f"LISTA {total} documentos en indice {anio}", True, total)
 
     nuevos = errores = saltados = 0
     for i, doc_info in enumerate(docs):
@@ -832,7 +948,7 @@ def scrape_historico(tipos, anio_desde, anio_hasta, delay=1.0, callback=None):
 def check_novedades(callback=None):
     anio = date.today().year
     tipos = ['circular', 'resolucion', 'oficio_iva', 'oficio_lir', 'oficio_otras']
-    log.info(f"⏰ Verificando novedades {anio}...")
+    log.info(f"Verificando novedades {anio}...")
     if callback: callback(f"Verificando novedades {anio}...")
     total = 0
     for tipo in tipos:
@@ -841,7 +957,7 @@ def check_novedades(callback=None):
             total += r.get('nuevos', 0)
         except Exception as e:
             log.error(f"Error {tipo}: {e}")
-    log.info(f"✅ {total} documentos nuevos")
+    log.info(f"OK {total} documentos nuevos")
     if callback: callback(f"DAILY_DONE|{total}")
     return total
 
@@ -849,11 +965,11 @@ def iniciar_scheduler():
     try:
         import schedule, threading
         def job():
-            log.info("⏰ Verificación diaria")
+            log.info("Verificacion diaria")
             check_novedades()
         schedule.every().day.at("08:00").do(job)
         def run():
-            log.info("✅ Scheduler activo — 08:00 diario")
+            log.info("Scheduler activo - 08:00 diario")
             while True:
                 schedule.run_pending()
                 time.sleep(60)
@@ -882,3 +998,5 @@ if __name__ == '__main__':
     else:
         for anio in range(args.hasta, args.desde-1, -1):
             scrape_anio(args.tipo, anio, delay=args.delay)
+
+

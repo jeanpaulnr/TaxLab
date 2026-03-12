@@ -12,10 +12,14 @@ import re
 import hashlib
 import threading
 import logging
+import textwrap
 from datetime import datetime, date
+
+import fitz
 
 from migraciones import run_migrations
 from rag import responder_consulta_tributaria
+from pdf_layout import build_pdf_path
 
 app = Flask(__name__)
 BASE = os.path.dirname(os.path.abspath(__file__))
@@ -75,6 +79,8 @@ CREATE TABLE IF NOT EXISTS documentos (
     articulos_clave TEXT,
     paginas         INTEGER DEFAULT 0,
     chars_texto     INTEGER DEFAULT 0,
+    pdf_local       TEXT,
+    pdf_size_bytes  INTEGER DEFAULT 0,
     vigente         INTEGER DEFAULT 1,
     reemplazado_por TEXT,
     fecha_carga     TEXT DEFAULT (datetime('now')),
@@ -93,6 +99,12 @@ END;
 CREATE TRIGGER IF NOT EXISTS docs_ad AFTER DELETE ON documentos BEGIN
     INSERT INTO docs_fts(docs_fts, rowid, titulo, materia, subtema, contenido, resumen, palabras_clave, leyes_citadas, articulos_clave)
     VALUES('delete', old.id, old.titulo, old.materia, old.subtema, old.contenido, old.resumen, old.palabras_clave, old.leyes_citadas, old.articulos_clave);
+END;
+CREATE TRIGGER IF NOT EXISTS docs_au AFTER UPDATE ON documentos BEGIN
+    INSERT INTO docs_fts(docs_fts, rowid, titulo, materia, subtema, contenido, resumen, palabras_clave, leyes_citadas, articulos_clave)
+    VALUES('delete', old.id, old.titulo, old.materia, old.subtema, old.contenido, old.resumen, old.palabras_clave, old.leyes_citadas, old.articulos_clave);
+    INSERT INTO docs_fts(rowid, titulo, materia, subtema, contenido, resumen, palabras_clave, leyes_citadas, articulos_clave)
+    VALUES(new.id, new.titulo, new.materia, new.subtema, new.contenido, new.resumen, new.palabras_clave, new.leyes_citadas, new.articulos_clave);
 END;
 CREATE TABLE IF NOT EXISTS articulos_idx (
     id       INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -146,17 +158,72 @@ CREATE TABLE IF NOT EXISTS scheduler_config (
 );
 """
 
-MATERIAS = [
-    'IVA', 'Renta', 'Timbre', 'Herencias', 'Bienes Raices', 'Ganancias de Capital',
-    'Gastos Necesarios', 'Pro Pyme', 'Renta Atribuida', 'Regimen Semi Integrado',
-    'FUT', 'RAI', 'SAC', 'DDAN', 'REX', 'Impuesto Adicional',
-    'Impuesto Global Complementario', 'Segunda Categoria', 'Teletrabajo',
-    'Servicios Digitales', 'Exportaciones', 'Facturas', 'Contabilidad',
-    'Depreciacion', 'Correccion Monetaria', 'Fiscalizacion', 'Tasacion',
-    'Citacion', 'Liquidacion', 'Giro', 'Prescripcion', 'Recursos',
-    'Tribunal Tributario', 'PPMO', 'PPM', 'F29', 'F22',
-]
+MATERIAS_FALLBACK = []
 LEYES = ['LIR', 'LIVS', 'CT', 'LTE', 'LH', 'LMT', 'LRT']
+
+
+def get_asset_path(stored_path):
+    if not stored_path:
+        return None
+    normalized = stored_path.replace('/', os.sep)
+    return normalized if os.path.isabs(normalized) else os.path.join(BASE, normalized)
+
+
+def estimar_paginas_texto(texto, chars_por_pagina=2800):
+    limpio = (texto or '').strip()
+    if not limpio:
+        return 0
+    return max(1, (len(limpio) + chars_por_pagina - 1) // chars_por_pagina)
+
+
+def generar_pdf_desde_texto(titulo, texto):
+    contenido = f"{(titulo or '').strip()}\n\n{(texto or '').strip()}".strip()
+    if not contenido:
+        return None
+
+    doc = fitz.open()
+    rect = fitz.paper_rect('a4')
+    margin_x = 42
+    margin_y = 48
+    line_height = 14
+    wrap_width = 95
+
+    lineas = []
+    for bloque in contenido.splitlines():
+        bloque = bloque.rstrip()
+        if not bloque:
+            lineas.append('')
+            continue
+        partes = textwrap.wrap(
+            bloque,
+            width=wrap_width,
+            replace_whitespace=False,
+            drop_whitespace=False,
+        ) or ['']
+        lineas.extend([parte.rstrip() for parte in partes])
+
+    pagina = None
+    y = rect.height
+    for linea in lineas:
+        if pagina is None or y + line_height > rect.height - margin_y:
+            pagina = doc.new_page(width=rect.width, height=rect.height)
+            y = margin_y
+        pagina.insert_text((margin_x, y), linea, fontsize=10.5, fontname='helv')
+        y += line_height
+
+    return doc.tobytes()
+
+
+def build_manual_pdf(anio, tipo, numero, titulo, contenido):
+    pdf_bytes = generar_pdf_desde_texto(titulo, contenido)
+    if not pdf_bytes:
+        return None, None, 0
+    numero_seguro = re.sub(r'[^0-9A-Za-z._-]+', '_', str(numero or 'manual')).strip('._-') or 'manual'
+    filename = f"{tipo}_{anio}_{numero_seguro}_manual.pdf"
+    pdf_path = build_pdf_path(tipo, anio, filename)
+    with open(pdf_path, 'wb') as handle:
+        handle.write(pdf_bytes)
+    return os.path.relpath(pdf_path, BASE).replace('\\', '/'), hashlib.md5(pdf_bytes).hexdigest(), len(pdf_bytes)
 
 
 def get_db():
@@ -199,12 +266,6 @@ def tipo_formal(tipo):
         'judicial': 'Jurisprudencia Judicial',
     }.get(tipo, str(tipo).capitalize())
 
-
-def get_judicial_asset_path(stored_path):
-    if not stored_path:
-        return None
-    normalized = stored_path.replace('/', os.sep)
-    return normalized if os.path.isabs(normalized) else os.path.join(BASE, normalized)
 
 
 def get_total_docs():
@@ -256,6 +317,9 @@ def get_catalog_context():
         except sqlite3.OperationalError:
             cortes_judiciales, cuerpos_judiciales = [], []
 
+        c.execute("SELECT DISTINCT materia FROM documentos WHERE materia IS NOT NULL AND trim(materia)<>'' ORDER BY materia")
+        materias = [row[0] for row in c.fetchall()] or list(MATERIAS_FALLBACK)
+
         c.execute('SELECT COUNT(*) FROM casos')
         total_casos = c.fetchone()[0]
 
@@ -268,7 +332,7 @@ def get_catalog_context():
             'por_anio': por_anio,
             'recientes': recientes,
             'top_arts': top_arts,
-            'materias': MATERIAS,
+            'materias': materias,
             'leyes': LEYES,
             'cortes_judiciales': cortes_judiciales,
             'cuerpos_judiciales': cuerpos_judiciales,
@@ -299,7 +363,7 @@ def load_document_context(doc_id):
         c = conn.cursor()
         c.execute(
             """
-            SELECT d.*, jd.sii_id, jd.tipo_codigo, jd.corte, jd.tribunal, jd.pdf_local, jd.html_local
+            SELECT d.*, jd.sii_id, jd.tipo_codigo, jd.corte, jd.tribunal, jd.pdf_local AS judicial_pdf_local, jd.html_local
             FROM documentos d
             LEFT JOIN judicial_docs jd ON jd.doc_id = d.id
             WHERE d.id = ?
@@ -313,7 +377,7 @@ def load_document_context(doc_id):
         doc = dict(row)
         doc['leyes_citadas'] = safe_json_loads(doc.get('leyes_citadas'))
         doc['articulos_clave'] = safe_json_loads(doc.get('articulos_clave'))
-        doc['pdf_url'] = f'/documento/{doc_id}/pdf' if doc.get('pdf_local') else None
+        doc['pdf_url'] = f'/documento/{doc_id}/pdf' if (doc.get('pdf_local') or doc.get('judicial_pdf_local')) else None
 
         judicial_relaciones = []
         judicial_por_norma = []
@@ -342,7 +406,22 @@ def load_document_context(doc_id):
 
         relacionados = []
         articulos = doc['articulos_clave'][:4]
-        if articulos:
+        leyes_rel = doc['leyes_citadas'][:2]
+        if articulos and len(leyes_rel) == 1:
+            placeholders = ','.join(['?'] * len(articulos))
+            c.execute(
+                f"""
+                SELECT DISTINCT d.id, d.tipo, d.numero, d.anio, d.titulo, d.referencia, d.materia, d.paginas
+                FROM articulos_idx ai
+                JOIN documentos d ON d.id = ai.doc_id
+                WHERE ai.ley = ? AND ai.articulo IN ({placeholders}) AND d.id != ?
+                ORDER BY d.anio DESC
+                LIMIT 8
+                """,
+                [leyes_rel[0]] + articulos + [doc_id],
+            )
+            relacionados = [dict(row) for row in c.fetchall()]
+        elif articulos:
             placeholders = ','.join(['?'] * len(articulos))
             c.execute(
                 f"""
@@ -542,7 +621,7 @@ def buscar():
             where.append('d.leyes_citadas LIKE ?')
             params.append(f'%"{ley}"%')
         if materia:
-            where.append('d.materia LIKE ?')
+            where.append("COALESCE(d.materia, '') LIKE ?")
             params.append(f'%{materia}%')
         if articulo:
             where.append('(d.articulos_clave LIKE ? OR jr.articulo LIKE ?)')
@@ -568,7 +647,7 @@ def buscar():
             SELECT d.id, d.tipo, d.numero, d.anio, d.fecha, d.titulo, d.materia,
                    d.referencia, d.resumen, d.leyes_citadas, d.articulos_clave,
                    d.vigente, d.paginas, d.chars_texto, d.url_sii,
-                   jd.corte, jd.tribunal, jd.tipo_codigo, jd.pdf_local,
+                   jd.corte, jd.tribunal, jd.tipo_codigo, COALESCE(d.pdf_local, jd.pdf_local) AS pdf_local,
                    GROUP_CONCAT(DISTINCT jr.cuerpo_normativo) AS cuerpos_normativos,
                    SUBSTR(d.contenido, 1, 700) AS extracto
             {base_from}
@@ -671,7 +750,7 @@ def descargar_pdf_documento(doc_id):
     try:
         row = conn.execute(
             """
-            SELECT d.tipo, d.referencia, jd.pdf_local
+            SELECT d.tipo, d.referencia, COALESCE(d.pdf_local, jd.pdf_local) AS pdf_local
             FROM documentos d
             LEFT JOIN judicial_docs jd ON jd.doc_id = d.id
             WHERE d.id = ?
@@ -681,10 +760,10 @@ def descargar_pdf_documento(doc_id):
     finally:
         conn.close()
 
-    if not row or row['tipo'] != 'judicial' or not row['pdf_local']:
+    if not row or not row['pdf_local']:
         return 'PDF no disponible', 404
 
-    abs_path = get_judicial_asset_path(row['pdf_local'])
+    abs_path = get_asset_path(row['pdf_local'])
     if not abs_path or not os.path.exists(abs_path):
         return 'PDF no encontrado en disco', 404
 
@@ -1155,7 +1234,7 @@ def agregar():
         import sys
         sys.path.insert(0, os.path.join(BASE, 'scraper'))
         try:
-            from engine import detectar_leyes, detectar_articulos
+            from engine import detectar_leyes, detectar_articulos, guardar_documento
             texto = f"{data.get('titulo', '')} {data.get('contenido', '')}"
             if not data.get('leyes_citadas'):
                 data['leyes_citadas'] = json.dumps(detectar_leyes(texto))
@@ -1164,31 +1243,32 @@ def agregar():
         except Exception:
             pass
 
-        data['hash_md5'] = hashlib.md5((data.get('titulo', '') + str(data.get('anio', ''))).encode()).hexdigest()
+        contenido = (data.get('contenido') or '').strip()
+        anio = int(data.get('anio') or date.today().year)
+        tipo = (data.get('tipo') or 'manual').strip().lower()
+        numero = (data.get('numero') or '').strip()
+        pdf_local, pdf_hash, pdf_size = build_manual_pdf(anio, tipo, numero, data.get('titulo', ''), contenido)
+        if not pdf_local:
+            return jsonify({'ok': False, 'error': 'No fue posible generar el PDF canonico del documento manual'})
+
+        data['hash_md5'] = pdf_hash
+        data['anio'] = anio
+        data['tipo'] = tipo
+        data['paginas'] = estimar_paginas_texto(contenido)
+        data['chars_texto'] = len(contenido)
+        data['pdf_local'] = pdf_local
+        data['pdf_size_bytes'] = pdf_size
+        data['fuente'] = data.get('fuente') or 'manual'
         if not data.get('referencia'):
             data['referencia'] = f"{tipo_formal(data['tipo'])} N{data.get('numero', '')} de {data.get('anio', '')}"
 
-        conn = get_db()
         try:
-            cursor = conn.cursor()
-            cursor.execute(
-                """
-                INSERT OR IGNORE INTO documentos
-                (hash_md5, tipo, numero, anio, fecha, titulo, materia, subtema, contenido,
-                 resumen, url_sii, referencia, palabras_clave, leyes_citadas, articulos_clave)
-                VALUES(:hash_md5, :tipo, :numero, :anio, :fecha, :titulo, :materia, :subtema,
-                       :contenido, :resumen, :url_sii, :referencia, :palabras_clave,
-                       :leyes_citadas, :articulos_clave)
-                """,
-                data,
-            )
-            doc_id = cursor.lastrowid
-            conn.commit()
+            doc_id = guardar_documento(data)
+            if not doc_id:
+                return jsonify({'ok': False, 'error': 'No fue posible guardar el documento manual'})
             return jsonify({'ok': True, 'id': doc_id})
         except Exception as exc:
             return jsonify({'ok': False, 'error': str(exc)})
-        finally:
-            conn.close()
 
     context = get_catalog_context()
     return render_app(

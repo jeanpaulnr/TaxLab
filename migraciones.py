@@ -10,6 +10,8 @@ DOCUMENTO_COLUMNS = {
     'sentido_criterio': 'TEXT',
     'tema_central': 'TEXT',
     'documento_relacionado': 'TEXT',
+    'pdf_local': 'TEXT',
+    'pdf_size_bytes': 'INTEGER DEFAULT 0',
 }
 
 CASOS_SQL = """
@@ -62,6 +64,17 @@ def run_migrations(db_path=DB):
     try:
         conn.executescript(CASOS_SQL)
         applied.append('tablas_casos')
+        conn.executescript(
+            """
+            CREATE TRIGGER IF NOT EXISTS docs_au AFTER UPDATE ON documentos BEGIN
+                INSERT INTO docs_fts(docs_fts, rowid, titulo, materia, subtema, contenido, resumen, palabras_clave, leyes_citadas, articulos_clave)
+                VALUES('delete', old.id, old.titulo, old.materia, old.subtema, old.contenido, old.resumen, old.palabras_clave, old.leyes_citadas, old.articulos_clave);
+                INSERT INTO docs_fts(rowid, titulo, materia, subtema, contenido, resumen, palabras_clave, leyes_citadas, articulos_clave)
+                VALUES(new.id, new.titulo, new.materia, new.subtema, new.contenido, new.resumen, new.palabras_clave, new.leyes_citadas, new.articulos_clave);
+            END;
+            """
+        )
+        applied.append('trigger_docs_au')
 
         if table_exists(conn, 'documentos'):
             for column_name, column_type in DOCUMENTO_COLUMNS.items():
@@ -69,6 +82,21 @@ def run_migrations(db_path=DB):
                     continue
                 conn.execute(f'ALTER TABLE documentos ADD COLUMN {column_name} {column_type}')
                 applied.append(f'documentos.{column_name}')
+
+            if table_exists(conn, 'judicial_docs') and column_exists(conn, 'documentos', 'pdf_local'):
+                conn.execute(
+                    """
+                    UPDATE documentos
+                    SET pdf_local = (
+                        SELECT jd.pdf_local
+                        FROM judicial_docs jd
+                        WHERE jd.doc_id = documentos.id
+                    )
+                    WHERE (pdf_local IS NULL OR pdf_local = '')
+                      AND id IN (SELECT doc_id FROM judicial_docs WHERE pdf_local IS NOT NULL AND pdf_local <> '')
+                    """
+                )
+                applied.append('sync_judicial_pdf_local')
 
         conn.commit()
         return applied
@@ -81,3 +109,5 @@ if __name__ == '__main__':
     print('Migraciones aplicadas:')
     for cambio in cambios:
         print(f' - {cambio}')
+
+
