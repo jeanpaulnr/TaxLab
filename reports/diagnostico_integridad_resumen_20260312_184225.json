@@ -1,0 +1,19 @@
+{
+  "resumen": {
+    "generated_at": "2026-03-12T18:42:25.423497",
+    "db_path": "C:\\Users\\jeanp\\Programas\\sii_normativa_v2.1\\data\\sii_normativa.db",
+    "desde": 2026,
+    "hasta": 2026,
+    "total_documentos": 0,
+    "por_tipo": [],
+    "documentos_contenido_vacio": 0,
+    "documentos_chars_cero": 0,
+    "documentos_sin_pdf": 0,
+    "documentos_paginas_cero": 0,
+    "documentos_sin_hash": 0,
+    "documentos_sin_pdf_size": 0,
+    "sospechosos_truncacion": 0,
+    "demasiado_cortos": 0
+  },
+  "por_anio": []
+}

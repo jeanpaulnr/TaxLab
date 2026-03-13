@@ -1,0 +1,106 @@
+{
+  "api_total": 3537,
+  "db_total": 3537,
+  "missing_total": 0,
+  "extra_total": 0,
+  "parity_percent": 100.0,
+  "by_corte": {
+    "Corte Suprema": {
+      "api": 715,
+      "db": 715
+    },
+    "Tribunal Constitucional": {
+      "api": 37,
+      "db": 37
+    },
+    "Corte de Apelaciones": {
+      "api": 993,
+      "db": 993
+    },
+    "Tribunal Tributario y Aduanero": {
+      "api": 1755,
+      "db": 1755
+    },
+    "Tribunal Oral en lo Penal": {
+      "api": 0,
+      "db": 0
+    },
+    "Juzgado de Garantía": {
+      "api": 17,
+      "db": 0
+    },
+    "Otros": {
+      "api": 20,
+      "db": 20
+    }
+  },
+  "by_year": {
+    "2026": {
+      "api": 6,
+      "db": 6
+    },
+    "2025": {
+      "api": 193,
+      "db": 193
+    },
+    "2024": {
+      "api": 170,
+      "db": 170
+    },
+    "2023": {
+      "api": 185,
+      "db": 185
+    },
+    "2022": {
+      "api": 140,
+      "db": 140
+    },
+    "2021": {
+      "api": 126,
+      "db": 126
+    },
+    "2020": {
+      "api": 391,
+      "db": 391
+    },
+    "2019": {
+      "api": 836,
+      "db": 836
+    },
+    "2018": {
+      "api": 32,
+      "db": 32
+    },
+    "2017": {
+      "api": 24,
+      "db": 24
+    },
+    "2016": {
+      "api": 114,
+      "db": 114
+    },
+    "2015": {
+      "api": 461,
+      "db": 461
+    },
+    "2014": {
+      "api": 235,
+      "db": 235
+    },
+    "2013": {
+      "api": 245,
+      "db": 245
+    },
+    "2012": {
+      "api": 378,
+      "db": 378
+    },
+    "2008": {
+      "api": 1,
+      "db": 1
+    }
+  },
+  "missing_ids": [],
+  "extra_ids": [],
+  "generated_at": "2026-03-12T22:23:08"
+}

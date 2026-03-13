@@ -87,8 +87,38 @@ def obtener_urls_pdf(tipo_clave, anio, numero):
 OFICIO_API_KEYS = {
     'oficio_iva':   'IVA',    # Ley Impuesto Ventas y Servicios
     'oficio_lir':   'RENTA',  # Ley Impuesto a la Renta
-    'oficio_otras': 'OTRAS',  # Otras Normas (CT, Timbres, Herencias...)
+    'oficio_otras': 'OTROS',  # Otras Normas (CT, Timbres, Herencias...)
 }
+
+
+def oficio_pdf_categoria(tipo_clave, doc_info=None):
+    doc_info = doc_info or {}
+    api_key = (doc_info.get('_api_key') or '').strip().upper()
+    if tipo_clave == 'oficio_lir' or api_key == 'RENTA':
+        return 'lir'
+    if tipo_clave == 'oficio_iva' or api_key == 'IVA':
+        return 'iva'
+    if tipo_clave == 'oficio_otras' or api_key in {'OTRAS', 'OTROS'}:
+        return 'otras_normas'
+
+    subtema = (doc_info.get('pubLegal') or doc_info.get('descripcion') or '').upper()
+    if 'VENTAS' in subtema or 'IVA' in subtema:
+        return 'iva'
+    if 'RENTA' in subtema or 'LIR' in subtema:
+        return 'lir'
+    return 'otras_normas'
+
+
+def oficio_subtema_prefijo(tipo_clave, doc_info=None):
+    doc_info = doc_info or {}
+    api_key = (doc_info.get('_api_key') or '').strip().upper()
+    if tipo_clave == 'oficio_lir' or api_key == 'RENTA':
+        return 'RENTA'
+    if tipo_clave == 'oficio_iva' or api_key == 'IVA':
+        return 'IVA'
+    if tipo_clave == 'oficio_otras' or api_key in {'OTRAS', 'OTROS'}:
+        return 'OTRAS'
+    return 'OTRAS'
 
 MESES = {
     'enero': '01',
@@ -120,6 +150,24 @@ def doc_existe_hash(hash_md5):
     conn.close()
     return r is not None
 
+def doc_id_por_hash(hash_md5):
+    conn = get_db()
+    r = conn.execute("SELECT id FROM documentos WHERE hash_md5=?", (hash_md5,)).fetchone()
+    conn.close()
+    return r['id'] if r else None
+
+def doc_existe_url(url_sii):
+    conn = get_db()
+    r = conn.execute("SELECT id FROM documentos WHERE url_sii=?", (url_sii,)).fetchone()
+    conn.close()
+    return r is not None
+
+def doc_id_por_url(url_sii):
+    conn = get_db()
+    r = conn.execute("SELECT id FROM documentos WHERE url_sii=?", (url_sii,)).fetchone()
+    conn.close()
+    return r['id'] if r else None
+
 def doc_existe(tipo, numero, anio):
     tipo_n = tipo.split('_')[0]
     conn = get_db()
@@ -127,6 +175,48 @@ def doc_existe(tipo, numero, anio):
                      (tipo_n, numero, anio)).fetchone()
     conn.close()
     return r is not None
+
+def ensure_oficio_fuentes_table():
+    conn = get_db()
+    try:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS oficio_fuentes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                doc_id INTEGER NOT NULL REFERENCES documentos(id) ON DELETE CASCADE,
+                anio INTEGER,
+                api_key TEXT,
+                numero TEXT,
+                blob_id TEXT UNIQUE,
+                url_sii TEXT,
+                fecha_pub TEXT,
+                created_at TEXT DEFAULT (datetime('now'))
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_oficio_fuentes_doc ON oficio_fuentes(doc_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_oficio_fuentes_anio ON oficio_fuentes(anio)")
+        conn.commit()
+    finally:
+        conn.close()
+
+def registrar_oficio_fuente(doc_id, anio, api_key, numero, blob_id, url_sii, fecha_pub):
+    if not doc_id or not blob_id:
+        return
+    conn = get_db()
+    try:
+        conn.execute("""
+            INSERT INTO oficio_fuentes(doc_id, anio, api_key, numero, blob_id, url_sii, fecha_pub)
+            VALUES(?,?,?,?,?,?,?)
+            ON CONFLICT(blob_id) DO UPDATE SET
+                doc_id=excluded.doc_id,
+                anio=excluded.anio,
+                api_key=excluded.api_key,
+                numero=excluded.numero,
+                url_sii=excluded.url_sii,
+                fecha_pub=excluded.fecha_pub
+        """, (doc_id, anio, api_key, numero, blob_id, url_sii, fecha_pub))
+        conn.commit()
+    finally:
+        conn.close()
 
 # ── PyMuPDF ───────────────────────────────────────────────────────────────
 def extraer_texto_pdf(pdf_bytes):
@@ -277,6 +367,30 @@ def extraer_fecha_texto(texto):
     m2 = re.search(r'(\d{4})-(\d{2})-(\d{2})', texto[:1000])
     return m2.group(0) if m2 else None
 
+
+def extraer_fecha_oficio(texto, numero=None):
+    encabezado = (texto or '')[:3000]
+    patrones = []
+    if numero:
+        nro = re.escape(str(numero).strip())
+        patrones.extend([
+            rf'ORD\.\s*N[°ºo]?\s*{nro}\s*,?\s*DE\s*(\d{{1,2}}[./-]\d{{1,2}}[./-]\d{{4}})',
+            rf'OFICIO\s+ORDINARIO\s*N[°ºo]?\s*{nro}\s*,?\s*DE\s*(\d{{1,2}}[./-]\d{{1,2}}[./-]\d{{4}})',
+            rf'N[°ºo]?\s*{nro}\s*,?\s*DE\s*(\d{{1,2}}[./-]\d{{1,2}}[./-]\d{{4}})',
+        ])
+    patrones.append(r'ORD\.\s*N[°ºo]?\s*\d+\s*,?\s*DE\s*(\d{1,2}[./-]\d{1,2}[./-]\d{4})')
+
+    for patron in patrones:
+        m = re.search(patron, encabezado, re.IGNORECASE)
+        if not m:
+            continue
+        fecha_bruta = m.group(1).replace('/', '.').replace('-', '.')
+        m_fecha = re.match(r'(\d{1,2})\.(\d{1,2})\.(\d{4})', fecha_bruta)
+        if m_fecha:
+            d, mo, y = m_fecha.groups()
+            return f"{y}-{mo.zfill(2)}-{d.zfill(2)}"
+    return None
+
 def _convertir_fecha(fecha_str, anio):
     if not fecha_str: return f"{anio}-01-01"
     m = re.match(r'(\d{1,2})/(\d{1,2})/(\d{4})', fecha_str)
@@ -357,9 +471,41 @@ def guardar_documento(data):
     payload.setdefault('pdf_size_bytes', 0)
     payload.setdefault('fuente', 'scraper')
 
-    if not (payload.get('contenido') or '').strip():
+    contenido = (payload.get('contenido') or '').strip()
+    if not contenido:
         log.warning('Documento sin contenido util: %s/%s/%s', payload.get('tipo'), payload.get('anio'), payload.get('numero'))
         return None
+
+    if not payload.get('hash_md5'):
+        log.warning('Documento sin hash: %s/%s/%s', payload.get('tipo'), payload.get('anio'), payload.get('numero'))
+        return None
+
+    pdf_local = (payload.get('pdf_local') or '').strip()
+    if not pdf_local:
+        log.warning('Documento sin pdf_local: %s/%s/%s', payload.get('tipo'), payload.get('anio'), payload.get('numero'))
+        return None
+
+    abs_pdf_path = pdf_local if os.path.isabs(pdf_local) else os.path.join(BASE, pdf_local.replace('/', os.sep))
+    if not os.path.exists(abs_pdf_path):
+        log.warning('Documento con pdf_local inexistente: %s', abs_pdf_path)
+        return None
+
+    if int(payload.get('pdf_size_bytes') or 0) <= 0:
+        try:
+            payload['pdf_size_bytes'] = os.path.getsize(abs_pdf_path)
+        except OSError:
+            log.warning('Documento sin pdf_size_bytes util: %s/%s/%s', payload.get('tipo'), payload.get('anio'), payload.get('numero'))
+            return None
+
+    if int(payload.get('paginas') or 0) <= 0:
+        log.warning('Documento con paginas no pobladas: %s/%s/%s', payload.get('tipo'), payload.get('anio'), payload.get('numero'))
+        return None
+
+    if int(payload.get('chars_texto') or 0) <= 0:
+        payload['chars_texto'] = len(contenido)
+        if payload['chars_texto'] <= 0:
+            log.warning('Documento con chars_texto no util: %s/%s/%s', payload.get('tipo'), payload.get('anio'), payload.get('numero'))
+            return None
 
     conn = get_db()
     try:
@@ -367,7 +513,8 @@ def guardar_documento(data):
             "SELECT id, hash_md5 FROM documentos WHERE tipo=? AND numero=? AND anio=?",
             (payload.get('tipo'), payload.get('numero'), payload.get('anio')),
         ).fetchone()
-        if same_identity and same_identity['hash_md5'] != payload['hash_md5']:
+        enforce_identity = payload.get('tipo') not in {'oficio', 'judicial'}
+        if enforce_identity and same_identity and same_identity['hash_md5'] != payload['hash_md5']:
             log.warning(
                 "Identidad documental existente con hash distinto; se actualiza: %s/%s/%s",
                 payload.get('tipo'), payload.get('anio'), payload.get('numero')
@@ -684,7 +831,18 @@ def descargar_pdf(url, retries=3, delay=1.0):
 def _procesar_y_guardar(pdf_bytes, tipo_norm, tipo_clave, numero, anio,
                          doc_info, url_ref, callback, i, total):
     # Guardar en disco
-    pdf_path = build_pdf_path(tipo_norm, anio, f"{tipo_norm}_{anio}_{numero.zfill(4)}.pdf")
+    pdf_categoria = oficio_pdf_categoria(tipo_clave, doc_info) if tipo_norm == 'oficio' else None
+    blob_suffix = ""
+    if tipo_norm == 'oficio':
+        blob_id = (doc_info.get('_blob_id') or '').strip()
+        if blob_id:
+            blob_suffix = f"_{blob_id[:8]}"
+    pdf_path = build_pdf_path(
+        tipo_norm,
+        anio,
+        f"{tipo_norm}_{anio}_{numero.zfill(4)}{blob_suffix}.pdf",
+        categoria=pdf_categoria,
+    )
     try:
         with open(pdf_path, 'wb') as f: f.write(pdf_bytes)
     except: pass
@@ -700,7 +858,15 @@ def _procesar_y_guardar(pdf_bytes, tipo_norm, tipo_clave, numero, anio,
 
     leyes   = detectar_leyes(texto)
     arts    = detectar_articulos(texto)
-    fecha   = extraer_fecha_texto(texto) or doc_info.get('fecha', f"{anio}-01-01")
+    if tipo_norm == 'oficio':
+        fecha = (
+            doc_info.get('fecha')
+            or extraer_fecha_oficio(texto, numero)
+            or extraer_fecha_texto(texto)
+            or f"{anio}-01-01"
+        )
+    else:
+        fecha = extraer_fecha_texto(texto) or doc_info.get('fecha', f"{anio}-01-01")
     resumen = extraer_resumen(texto)
 
     titulo = (doc_info.get('titulo') or doc_info.get('pubLegal') or doc_info.get('descripcion') or '')
@@ -710,7 +876,7 @@ def _procesar_y_guardar(pdf_bytes, tipo_norm, tipo_clave, numero, anio,
 
     if tipo_norm == 'oficio':
         referencia = f"Oficio Ordinario N°{numero}, de {fecha}"
-        subtema = f"{doc_info.get('_api_key','')} — {doc_info.get('pubLegal','')[:250]}"
+        subtema = f"{oficio_subtema_prefijo(tipo_clave, doc_info)} — {doc_info.get('pubLegal','')[:250]}"
     elif tipo_norm == 'circular':
         referencia = f"Circular N°{numero} de {anio}"
         subtema = doc_info.get('descripcion','')[:200]
@@ -770,6 +936,8 @@ def scrape_anio(tipo_clave, anio, callback=None, delay=0.8):
             if callback: callback(msg, False, 0)
             return {'ok': False, 'tipo': tipo_clave, 'anio': anio, 'total': 0, 'nuevos': 0, 'saltados': 0, 'errores': 0}
 
+        ensure_oficio_fuentes_table()
+
         if callback: callback(f"API SII: key={api_key}, year={anio}...", True, 0)
         items = obtener_oficios_api(api_key, anio)
 
@@ -794,18 +962,20 @@ def scrape_anio(tipo_clave, anio, callback=None, delay=0.8):
             if not numero:
                 errores += 1; continue
 
-            if doc_existe('oficio', numero, anio):
-                saltados += 1
-                if saltados % 20 == 0 and callback:
-                    callback(f"[{i+1}/{total}] Ya indexados: {saltados}", True, total)
-                continue
-
             if not id_blob or id_blob in ('None', '0', ''):
                 errores += 1
                 log.warning(f"  Oficio N°{numero}/{anio}: sin blob ID")
                 continue
 
             url_ref = f"{SII_API}/accesoADoctosCT?id={id_blob}"
+            existing_by_url = doc_id_por_url(url_ref)
+            if existing_by_url:
+                registrar_oficio_fuente(existing_by_url, anio, api_key, numero, id_blob, url_ref, _convertir_fecha(fecha_pub, anio))
+                saltados += 1
+                if saltados % 20 == 0 and callback:
+                    callback(f"[{i+1}/{total}] Ya indexados: {saltados}", True, total)
+                continue
+
             pdf_bytes = descargar_pdf_oficio(id_blob, nombre_doc, extension, mtype)
 
             if pdf_bytes is None:
@@ -815,8 +985,16 @@ def scrape_anio(tipo_clave, anio, callback=None, delay=0.8):
                 time.sleep(delay * 0.5)
                 continue
 
+            hash_doc = hashlib.md5(pdf_bytes).hexdigest()
+            existing_by_hash = doc_id_por_hash(hash_doc)
+            if existing_by_hash:
+                registrar_oficio_fuente(existing_by_hash, anio, api_key, numero, id_blob, url_ref, _convertir_fecha(fecha_pub, anio))
+                saltados += 1
+                continue
+
             doc_info = {
                 '_api_key':    api_key,
+                '_blob_id':    id_blob,
                 'titulo':      item.get('pubLegal', ''),
                 'pubLegal':    item.get('pubLegal', ''),
                 'descripcion': item.get('pubResumen', ''),
@@ -826,6 +1004,9 @@ def scrape_anio(tipo_clave, anio, callback=None, delay=0.8):
                 pdf_bytes, 'oficio', tipo_clave, numero, anio,
                 doc_info, url_ref, callback, i, total
             )
+            if ok:
+                doc_id = doc_id_por_url(url_ref) or doc_id_por_hash(hashlib.md5(pdf_bytes).hexdigest())
+                registrar_oficio_fuente(doc_id, anio, api_key, numero, id_blob, url_ref, _convertir_fecha(fecha_pub, anio))
             if nuevo:    nuevos += 1
             elif not ok: errores += 1
             else:        saltados += 1

@@ -1,0 +1,8 @@
+Circular Nº 32 del 20 de Junio del 2005
+MATERIA: Instruye sobre las acciones de presencia y de verificación de la Representación Impresa de un Documento Tributario Electrónico
+
+[PAGINA 1]
+ELECTRONICAS S.A. RUE: 77.77.0777 — FACTURA ELECTRONICA Giro: Insumos de Computación Teatinas 120, Fiso £ - Santiago ‘Nº 00107 Telefono 3951376 SAL - SANTIACO CETRO. Sefior (28): RECEPTOR DE FACTURA LIDA RUT. 78.888.888-8 Dirección: SAN DIEGO 2222 Giro: COMPUTACION Esp ias pa al vaa NRO SAA yA
+
+[PAGINA 2]
+Lectura de Tirnbre Electrónico con Lector mm: de Código de Barras == Timbre ilegible: Timbre legible sin mensaje o Mensaje de error > Mensaje > Verificación Timbre inconsistente Timbre consistente en Intranet ‘fica cic ‘ewan az Verificación verificación a en Intranet visual con datos del docurnento Lied Datos Datos no corresponden => corresponden => Timbre valido Timbre Invalido Verificación en Intranet

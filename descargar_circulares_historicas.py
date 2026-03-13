@@ -17,6 +17,7 @@ Pipeline por cada circular:
 
 import argparse
 import hashlib
+import io
 import json
 import os
 import re
@@ -25,6 +26,8 @@ import subprocess
 import tempfile
 import time
 import textwrap
+import unicodedata
+import zipfile
 from collections import OrderedDict
 from urllib.parse import urljoin, urlparse
 
@@ -119,22 +122,44 @@ def reparar_mojibake(texto):
 
 
 def decodificar_html(raw_bytes):
+    def score_text(texto):
+        sospechosos = ['\ufffd', 'µ', 'þ', '¦', '¯', 'Æ', 'Ḟ', 'Ķ', 'ċ', 'Ę']
+        score = sum(texto.count(ch) for ch in sospechosos) * 100
+        score -= sum(texto.count(ch) for ch in 'áéíóúÁÉÍÓÚñÑ°º') * 2
+        return score
+
+    candidatos = []
+    for encoding in ('windows-1252', 'latin-1', 'utf-8'):
+        try:
+            texto = raw_bytes.decode(encoding, errors='replace')
+            candidatos.append((encoding, texto))
+        except Exception:
+            continue
+
     deteccion = charset_normalizer.from_bytes(raw_bytes).best()
     if deteccion:
-        encoding = deteccion.encoding or 'desconocido'
-        texto = str(deteccion)
-    else:
-        try:
-            texto = raw_bytes.decode('windows-1252')
-            encoding = 'windows-1252'
-        except Exception:
-            texto = raw_bytes.decode('utf-8', errors='replace')
-            encoding = 'utf-8-fallback'
+        encoding_detectado = (deteccion.encoding or '').lower()
+        if encoding_detectado and encoding_detectado not in {'windows-1252', 'cp1252', 'latin-1', 'iso-8859-1'}:
+            candidatos.append((encoding_detectado, str(deteccion)))
+
+    if not candidatos:
+        return reparar_mojibake(raw_bytes.decode('utf-8', errors='replace')), 'utf-8-fallback'
+
+    encoding, texto = min(candidatos, key=lambda item: score_text(item[1]))
     return reparar_mojibake(texto), encoding
 
 
 def limpiar_texto(texto):
     return re.sub(r'\s+', ' ', (texto or '')).strip()
+
+
+def texto_comparable(texto):
+    texto = reparar_mojibake(texto or '')
+    texto = unicodedata.normalize('NFKD', texto)
+    texto = ''.join(ch for ch in texto if not unicodedata.combining(ch))
+    texto = texto.replace('º', 'o').replace('°', 'o')
+    texto = re.sub(r'[^0-9A-Za-z:]+', ' ', texto)
+    return limpiar_texto(texto).lower()
 
 
 def extraer_numero(titulo, base):
@@ -308,10 +333,21 @@ def extraer_texto_html(soup, titulo='', materia=''):
     lineas = []
     titulo_norm = limpiar_texto(normalizar_texto_ocr(titulo or ''))
     materia_norm = limpiar_texto(normalizar_texto_ocr(materia or ''))
+    titulo_cmp = texto_comparable(titulo_norm)
+    materia_cmp = texto_comparable(materia_norm)
 
     for raw in texto.splitlines():
         linea = limpiar_texto(normalizar_texto_ocr(raw))
         if es_linea_ruido_historico(linea):
+            continue
+        linea_cmp = texto_comparable(linea)
+        if titulo_cmp and (linea_cmp == titulo_cmp or (linea_cmp.startswith('circular') and titulo_cmp in linea_cmp)):
+            continue
+        if materia_cmp and (
+            linea_cmp == materia_cmp
+            or linea_cmp == f'materia: {materia_cmp}'
+            or (linea_cmp.startswith('materia') and materia_cmp in linea_cmp)
+        ):
             continue
         lineas.append(linea)
 
@@ -879,6 +915,7 @@ def extraer_urls_imagenes(page_url, html_text):
     prefijos = prefijos_documento(current_base)
     imagenes = []
     vistos = set()
+    fallback_imagenes = []
 
     for img in soup.find_all('img', src=True):
         src = img.get('src', '').strip()
@@ -889,14 +926,25 @@ def extraer_urls_imagenes(page_url, html_text):
         stem = os.path.splitext(base)[0].lower()
         if not IMAGE_EXT_RE.search(base):
             continue
-        if not any(stem.startswith(prefijo) for prefijo in prefijos):
-            continue
         if abs_url in vistos:
             continue
         vistos.add(abs_url)
-        imagenes.append(abs_url)
+        width = 0
+        height = 0
+        try:
+            width = int(re.sub(r'[^0-9]', '', img.get('width', '') or '0') or '0')
+        except Exception:
+            width = 0
+        try:
+            height = int(re.sub(r'[^0-9]', '', img.get('height', '') or '0') or '0')
+        except Exception:
+            height = 0
+        if width >= 120 or height >= 120:
+            fallback_imagenes.append(abs_url)
+        if any(stem.startswith(prefijo) for prefijo in prefijos):
+            imagenes.append(abs_url)
 
-    return imagenes
+    return imagenes or fallback_imagenes
 
 
 def es_linea_mayuscula_util(linea):
@@ -989,6 +1037,7 @@ def html_crudo_parece_scan(raw_bytes, url):
     except Exception:
         return False
 
+    soup = BeautifulSoup(html_text, 'lxml')
     current_base = os.path.splitext(os.path.basename(urlparse(url).path))[0]
     prefijos = prefijos_documento(current_base)
     html_lower = html_text.lower()
@@ -999,6 +1048,15 @@ def html_crudo_parece_scan(raw_bytes, url):
         return False
     if not any(prefijo in html_lower for prefijo in prefijos) and not re.search(r'\\[\\s*1\\s*\\].*\\[\\s*2\\s*\\]', html_text, re.IGNORECASE | re.DOTALL):
         return False
+    if contar_imagenes_documento(soup, url) == 0:
+        return False
+
+    titulo_html, materia_html = extraer_metadata_html(soup)
+    texto_limpio = extraer_texto_html(soup, titulo=titulo_html, materia=materia_html)
+    texto_norm = limpiar_texto(texto_limpio)
+    palabras = re.findall(r'[A-Za-z0-9]{4,}', texto_norm)
+    if len(texto_norm) >= 1800 and len(palabras) >= 180:
+        return False
     return True
 
 
@@ -1006,6 +1064,7 @@ def contar_imagenes_documento(soup, page_url):
     current_base = os.path.splitext(os.path.basename(urlparse(page_url).path))[0]
     prefijos = prefijos_documento(current_base)
     total = 0
+    total_grandes = 0
 
     for img in soup.find_all('img', src=True):
         src = img.get('src', '').strip()
@@ -1015,10 +1074,22 @@ def contar_imagenes_documento(soup, page_url):
         base = os.path.basename(urlparse(abs_url).path)
         if not IMAGE_EXT_RE.search(base):
             continue
+        width = 0
+        height = 0
+        try:
+            width = int(re.sub(r'[^0-9]', '', img.get('width', '') or '0') or '0')
+        except Exception:
+            width = 0
+        try:
+            height = int(re.sub(r'[^0-9]', '', img.get('height', '') or '0') or '0')
+        except Exception:
+            height = 0
+        if width >= 120 or height >= 120:
+            total_grandes += 1
         if any(os.path.splitext(base)[0].lower().startswith(prefijo) for prefijo in prefijos):
             total += 1
 
-    return total
+    return total or total_grandes
 
 
 def parece_html_escaneado(soup, page_url, texto_limpio):
@@ -1029,9 +1100,9 @@ def parece_html_escaneado(soup, page_url, texto_limpio):
     texto_norm = limpiar_texto(texto_limpio)
     palabras = re.findall(r'[A-Za-z0-9]{4,}', texto_norm)
 
-    if len(texto_norm) < 1200:
+    if len(texto_norm) < 700:
         return True
-    if len(palabras) < 120:
+    if len(palabras) < 90:
         return True
     return False
 
@@ -1288,6 +1359,62 @@ def procesar_doc(doc_bytes, url, anio, nombre):
     }
 
 
+def extraer_zip_suplementos(page_url, html_text):
+    soup = BeautifulSoup(html_text, 'lxml')
+    suplementos = []
+    vistos = set()
+    for a in soup.find_all('a', href=True):
+        href = (a.get('href') or '').strip()
+        if not href or not href.lower().endswith('.zip'):
+            continue
+        abs_url = urljoin(page_url, href)
+        if abs_url in vistos:
+            continue
+        vistos.add(abs_url)
+        suplementos.append(abs_url)
+    return suplementos
+
+
+def procesar_zip(zip_bytes, url, anio, nombre):
+    try:
+        zf = zipfile.ZipFile(io.BytesIO(zip_bytes))
+    except Exception:
+        return None
+
+    candidatos = []
+    for member in zf.namelist():
+        lower = member.lower()
+        if lower.endswith('.pdf'):
+            candidatos.append((0, member, 'pdf'))
+        elif lower.endswith('.doc') or lower.endswith('.docx'):
+            candidatos.append((1, member, 'doc'))
+        elif lower.endswith('.htm') or lower.endswith('.html'):
+            candidatos.append((2, member, 'html'))
+
+    candidatos.sort(key=lambda item: (item[0], item[1]))
+    for _, member, kind in candidatos:
+        try:
+            member_bytes = zf.read(member)
+        except Exception:
+            continue
+        member_url = f'{url}#{member}'
+        if kind == 'pdf':
+            return procesar_pdf(member_bytes, member_url, anio, nombre)
+        if kind == 'doc':
+            return procesar_doc(member_bytes, member_url, anio, nombre)
+        if kind == 'html':
+            class _Response:
+                headers = {'Content-Type': 'text/html'}
+            return procesar_html(member_bytes, _Response(), member_url, anio, nombre, fallback_title='')
+
+    return {
+        'ok': False,
+        'pendiente_zip': True,
+        'source_format': 'zip',
+        'url': url,
+    }
+
+
 def descargar_circular_historica(base_url, nombre_archivo, anio, fallback_title=''):
     base = nombre_archivo.rsplit('.', 1)[0]
     urls_intentar = [
@@ -1318,7 +1445,28 @@ def descargar_circular_historica(base_url, nombre_archivo, anio, fallback_title=
             return procesar_doc(response.content, url, anio, base)
         if html_crudo_parece_scan(response.content, url):
             return procesar_html_ocr(response.content, url, anio, base, fallback_title=fallback_title, usar_ocr=True)
-        return procesar_html(response.content, response, url, anio, base, fallback_title=fallback_title)
+        resultado_html = procesar_html(response.content, response, url, anio, base, fallback_title=fallback_title)
+        if resultado_html and resultado_html.get('ok'):
+            return resultado_html
+
+        try:
+            html_text, _ = decodificar_html(response.content)
+        except Exception:
+            html_text = ''
+
+        for zip_url in extraer_zip_suplementos(url, html_text):
+            try:
+                zip_response = SESSION.get(zip_url, timeout=20)
+            except Exception as e:
+                log.warning(f'[historico] error descarga {zip_url}: {e}')
+                continue
+            if zip_response.status_code != 200 or len(zip_response.content) <= 500:
+                continue
+            zip_resultado = procesar_zip(zip_response.content, zip_url, anio, base)
+            if zip_resultado:
+                return zip_resultado
+
+        return resultado_html
 
     return None
 

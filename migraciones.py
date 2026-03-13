@@ -83,6 +83,9 @@ def run_migrations(db_path=DB):
                 conn.execute(f'ALTER TABLE documentos ADD COLUMN {column_name} {column_type}')
                 applied.append(f'documentos.{column_name}')
 
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_doc_fuente ON documentos(fuente)')
+            applied.append('idx_doc_fuente')
+
             if table_exists(conn, 'judicial_docs') and column_exists(conn, 'documentos', 'pdf_local'):
                 conn.execute(
                     """

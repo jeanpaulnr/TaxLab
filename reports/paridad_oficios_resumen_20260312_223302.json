@@ -1,0 +1,198 @@
+{
+  "desde": 2019,
+  "hasta": 2026,
+  "years": [
+    {
+      "anio": 2026,
+      "categorias": {
+        "RENTA": {
+          "api": 28,
+          "db": 28,
+          "estado": "OK"
+        },
+        "IVA": {
+          "api": 25,
+          "db": 25,
+          "estado": "OK"
+        },
+        "OTROS": {
+          "api": 11,
+          "db": 11,
+          "estado": "OK"
+        }
+      },
+      "api_unique_blobs": 64,
+      "db_unique_blobs": 64,
+      "missing_unique_blobs": 0,
+      "missing_unique_items": []
+    },
+    {
+      "anio": 2025,
+      "categorias": {
+        "RENTA": {
+          "api": 102,
+          "db": 102,
+          "estado": "OK"
+        },
+        "IVA": {
+          "api": 94,
+          "db": 94,
+          "estado": "OK"
+        },
+        "OTROS": {
+          "api": 74,
+          "db": 74,
+          "estado": "OK"
+        }
+      },
+      "api_unique_blobs": 270,
+      "db_unique_blobs": 271,
+      "missing_unique_blobs": 0,
+      "missing_unique_items": []
+    },
+    {
+      "anio": 2024,
+      "categorias": {
+        "RENTA": {
+          "api": 82,
+          "db": 82,
+          "estado": "OK"
+        },
+        "IVA": {
+          "api": 69,
+          "db": 69,
+          "estado": "OK"
+        },
+        "OTROS": {
+          "api": 49,
+          "db": 49,
+          "estado": "OK"
+        }
+      },
+      "api_unique_blobs": 200,
+      "db_unique_blobs": 200,
+      "missing_unique_blobs": 0,
+      "missing_unique_items": []
+    },
+    {
+      "anio": 2023,
+      "categorias": {
+        "RENTA": {
+          "api": 165,
+          "db": 165,
+          "estado": "OK"
+        },
+        "IVA": {
+          "api": 220,
+          "db": 219,
+          "estado": "DIF"
+        },
+        "OTROS": {
+          "api": 72,
+          "db": 72,
+          "estado": "OK"
+        }
+      },
+      "api_unique_blobs": 456,
+      "db_unique_blobs": 456,
+      "missing_unique_blobs": 0,
+      "missing_unique_items": []
+    },
+    {
+      "anio": 2022,
+      "categorias": {
+        "RENTA": {
+          "api": 333,
+          "db": 333,
+          "estado": "OK"
+        },
+        "IVA": {
+          "api": 240,
+          "db": 239,
+          "estado": "DIF"
+        },
+        "OTROS": {
+          "api": 111,
+          "db": 110,
+          "estado": "DIF"
+        }
+      },
+      "api_unique_blobs": 682,
+      "db_unique_blobs": 682,
+      "missing_unique_blobs": 0,
+      "missing_unique_items": []
+    },
+    {
+      "anio": 2021,
+      "categorias": {
+        "RENTA": {
+          "api": 304,
+          "db": 304,
+          "estado": "OK"
+        },
+        "IVA": {
+          "api": 188,
+          "db": 186,
+          "estado": "DIF"
+        },
+        "OTROS": {
+          "api": 95,
+          "db": 95,
+          "estado": "OK"
+        }
+      },
+      "api_unique_blobs": 585,
+      "db_unique_blobs": 585,
+      "missing_unique_blobs": 0,
+      "missing_unique_items": []
+    },
+    {
+      "anio": 2020,
+      "categorias": {
+        "RENTA": {
+          "api": 169,
+          "db": 169,
+          "estado": "OK"
+        },
+        "IVA": {
+          "api": 113,
+          "db": 102,
+          "estado": "DIF"
+        },
+        "OTROS": {
+          "api": 49,
+          "db": 45,
+          "estado": "DIF"
+        }
+      },
+      "api_unique_blobs": 316,
+      "db_unique_blobs": 316,
+      "missing_unique_blobs": 0,
+      "missing_unique_items": []
+    },
+    {
+      "anio": 2019,
+      "categorias": {
+        "RENTA": {
+          "api": 132,
+          "db": 132,
+          "estado": "OK"
+        },
+        "IVA": {
+          "api": 76,
+          "db": 68,
+          "estado": "DIF"
+        },
+        "OTROS": {
+          "api": 63,
+          "db": 55,
+          "estado": "DIF"
+        }
+      },
+      "api_unique_blobs": 255,
+      "db_unique_blobs": 255,
+      "missing_unique_blobs": 0,
+      "missing_unique_items": []
+    }
+  ]
+}

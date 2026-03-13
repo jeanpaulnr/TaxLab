@@ -1,4 +1,4 @@
-﻿import os
+import os
 import re
 
 BASE = os.path.dirname(os.path.abspath(__file__))
@@ -23,11 +23,32 @@ def pdf_tipo_dir(tipo):
     return _safe_segment(tipo_n or "otros")
 
 
-def ensure_pdf_year_dir(tipo, anio):
-    year_dir = os.path.join(PDF_ROOT, pdf_tipo_dir(tipo), str(anio))
+def pdf_categoria_dir(tipo, categoria=None):
+    tipo_n = (tipo or "").strip().lower()
+    categoria_n = (categoria or "").strip().lower()
+
+    if pdf_tipo_dir(tipo_n) != "oficio":
+        return ""
+
+    if categoria_n in {"oficio_lir", "lir", "renta"} or tipo_n == "oficio_lir":
+        return "lir"
+    if categoria_n in {"oficio_iva", "iva"} or tipo_n == "oficio_iva":
+        return "iva"
+    if categoria_n in {"oficio_otras", "otras", "otras_normas", "otras normas"} or tipo_n == "oficio_otras":
+        return "otras_normas"
+    return ""
+
+
+def ensure_pdf_year_dir(tipo, anio, categoria=None):
+    parts = [PDF_ROOT, pdf_tipo_dir(tipo)]
+    categoria_dir = pdf_categoria_dir(tipo, categoria)
+    if categoria_dir:
+        parts.append(categoria_dir)
+    parts.append(str(anio))
+    year_dir = os.path.join(*parts)
     os.makedirs(year_dir, exist_ok=True)
     return year_dir
 
 
-def build_pdf_path(tipo, anio, filename):
-    return os.path.join(ensure_pdf_year_dir(tipo, anio), filename)
+def build_pdf_path(tipo, anio, filename, categoria=None):
+    return os.path.join(ensure_pdf_year_dir(tipo, anio, categoria=categoria), filename)

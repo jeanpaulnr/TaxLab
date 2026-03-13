@@ -1,98 +1,183 @@
-﻿{% extends 'base.html' %}
+{% extends 'base.html' %}
 
-{% block title %}Dashboard | TaxLab IA{% endblock %}
+{% block title %}Inicio | TaxLab{% endblock %}
+
+{% block page_styles %}
+<style>
+.dash-grid{display:grid;gap:18px}
+.hero-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:18px;align-items:start}
+.stat-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.stat-card{
+  padding:20px;border:1px solid var(--line);border-radius:28px;background:rgba(255,255,255,.04);
+}
+.stat-card strong{display:block;font-family:'Fraunces',serif;font-size:34px;line-height:1}
+.stat-card span{display:block;margin-top:8px;font-size:13px;color:var(--text-soft)}
+.hero-panel{
+  padding:24px;border:1px solid var(--line);border-radius:32px;background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.03));
+}
+.hero-panel h2{margin-top:14px;font-family:'Fraunces',serif;font-size:34px;line-height:1.08;letter-spacing:-.03em}
+.hero-panel p{margin-top:14px;color:var(--text-soft);font-size:14px;line-height:1.9;max-width:640px}
+.quick-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:18px}
+.quick-item{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px;border-radius:22px;border:1px solid var(--line);
+  background:rgba(6,9,13,.42);text-decoration:none;color:var(--text);
+}
+.quick-item small{display:block;margin-top:4px;color:var(--muted);font-size:11px}
+.mini-stack{display:grid;gap:18px}
+.mini-card{padding:20px;border:1px solid var(--line);border-radius:28px;background:rgba(255,255,255,.04)}
+.mini-card h3{font-size:20px}
+.mini-card p{margin-top:10px;color:var(--text-soft);font-size:14px;line-height:1.8}
+.recent-list,.saved-list,.alert-list{display:grid;gap:12px}
+.recent-item,.saved-item,.alert-item{
+  padding:16px;border:1px solid var(--line);border-radius:22px;background:rgba(255,255,255,.04);
+}
+.recent-title,.saved-title,.alert-title{font-size:14px;font-weight:700}
+.recent-meta,.saved-meta{margin-top:6px;color:var(--muted);font-size:12px}
+.recent-copy,.saved-copy,.alert-copy{margin-top:10px;color:var(--text-soft);font-size:13px;line-height:1.8}
+.section-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:18px;align-items:start}
+@media (max-width:1100px){
+  .hero-grid,.section-grid,.stat-grid,.quick-grid{grid-template-columns:1fr}
+}
+</style>
+{% endblock %}
 
 {% block top_actions %}
-<a class="btn btn-secondary" href="/app/buscar">Abrir base publica</a>
-<a class="btn btn-primary" href="/app/asistente">Probar asistente</a>
+<a class="btn btn-secondary" href="/app/buscar">Explorar normativa</a>
+<a class="btn btn-primary" href="/app/asistente">Nueva consulta</a>
 {% endblock %}
 
 {% block content %}
-<div class="kpi-grid" style="margin-bottom:18px;">
-  <div class="kpi">
-    <div class="kpi-value">{{ '{:,}'.format(total).replace(',', '.') }}</div>
-    <div class="kpi-label">Documentos publicos indexados</div>
-    <div class="kpi-note">Incluye circulares, oficios, resoluciones y judicial.</div>
-  </div>
-  <div class="kpi">
-    <div class="kpi-value">{{ por_tipo.get('judicial', 0) }}</div>
-    <div class="kpi-label">Jurisprudencia judicial</div>
-    <div class="kpi-note">Lista para citas, PDF local y filtros.</div>
-  </div>
-  <div class="kpi">
-    <div class="kpi-value">{{ total_casos }}</div>
-    <div class="kpi-label">Casos privados</div>
-    <div class="kpi-note">Espacios iniciales por cliente o asunto.</div>
-  </div>
-  <div class="kpi">
-    <div class="kpi-value">{{ nuevos_hoy }}</div>
-    <div class="kpi-label">Nuevos hoy</div>
-    <div class="kpi-note">Documentos detectados por la capa de ingestion.</div>
-  </div>
-</div>
-
-<div style="display:grid;grid-template-columns:1.3fr .9fr;gap:18px;align-items:start;">
-  <section class="card">
-    <div class="card-head">
-      <div class="card-title">Mapa del producto</div>
+<div class="dash-grid">
+  <div class="stat-grid">
+    <div class="stat-card">
+      <strong>{{ '{:,}'.format(total).replace(',', '.') }}</strong>
+      <span>Documentos indexados en el corpus</span>
     </div>
-    <div class="card-body">
-      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;">
-        <a href="/app/buscar" class="card" style="text-decoration:none;box-shadow:none;">
-          <div class="card-body">
-            <div class="badge info">Base publica SII</div>
-            <div style="margin-top:12px;font-family:'Crimson Pro',serif;font-size:25px;font-weight:700;">Busqueda documental</div>
-            <p style="margin-top:8px;color:var(--text-soft);line-height:1.7;font-size:14px;">Consulta el corpus completo del SII y jurisprudencia judicial con filtros por tipo, ley, articulo, corte y cuerpo normativo.</p>
-          </div>
-        </a>
-        <a href="/app/asistente" class="card" style="text-decoration:none;box-shadow:none;">
-          <div class="card-body">
-            <div class="badge success">Asistente tributario</div>
-            <div style="margin-top:12px;font-family:'Crimson Pro',serif;font-size:25px;font-weight:700;">Chat con evidencia</div>
-            <p style="margin-top:8px;color:var(--text-soft);line-height:1.7;font-size:14px;">Prepara el endpoint /api/chat y la superficie para respuestas con citas, riesgos y confianza.</p>
-          </div>
-        </a>
-        <a href="/app/casos" class="card" style="text-decoration:none;box-shadow:none;">
-          <div class="card-body">
-            <div class="badge warning">Casos privados</div>
-            <div style="margin-top:12px;font-family:'Crimson Pro',serif;font-size:25px;font-weight:700;">Vaults por cliente</div>
-            <p style="margin-top:8px;color:var(--text-soft);line-height:1.7;font-size:14px;">CRUD minimo de casos, notas y futura vinculacion con consultas IA y documentos guardados.</p>
-          </div>
-        </a>
-        <a href="/app/toolkit" class="card" style="text-decoration:none;box-shadow:none;">
-          <div class="card-body">
-            <div class="badge">Toolkit</div>
-            <div style="margin-top:12px;font-family:'Crimson Pro',serif;font-size:25px;font-weight:700;">Utilidades tributarias</div>
-            <p style="margin-top:8px;color:var(--text-soft);line-height:1.7;font-size:14px;">Estructura inicial para plazos, calendario tributario y tablas historicas.</p>
-          </div>
-        </a>
-      </div>
+    <div class="stat-card">
+      <strong>{{ por_tipo.get('judicial', 0) }}</strong>
+      <span>Jurisprudencias judiciales</span>
     </div>
-  </section>
+    <div class="stat-card">
+      <strong>{{ total_casos }}</strong>
+      <span>Casos privados creados</span>
+    </div>
+    <div class="stat-card">
+      <strong>{{ nuevos_hoy }}</strong>
+      <span>Nuevas entradas hoy</span>
+    </div>
+  </div>
 
-  <div style="display:grid;gap:18px;">
-    <section class="card">
-      <div class="card-head"><div class="card-title">Estado del corpus</div></div>
-      <div class="card-body tight">
-        <div style="display:grid;gap:10px;">
-          <div class="flash-inline">Ultima actualizacion registrada: <strong>{{ ultima_actualizacion or 'Sin registro' }}</strong></div>
-          <div class="flash-inline">Distribucion principal: judicial {{ por_tipo.get('judicial',0) }}, oficio {{ por_tipo.get('oficio',0) }}, resolucion {{ por_tipo.get('resolucion',0) }}, circular {{ por_tipo.get('circular',0) }}.</div>
-          <div class="flash-inline">El panel de scraping sigue operativo y no fue reemplazado. Solo se movio a una navegacion mas clara.</div>
-        </div>
+  <div class="hero-grid">
+    <section class="hero-panel">
+      <span class="badge success">Inicio inteligente</span>
+      <h2>Una base ordenada para buscar, leer, guardar y trabajar la normativa tributaria con criterio.</h2>
+      <p>La nueva base visual deja un recorrido claro: búsqueda documental, asistente con evidencia, guardados por caso, toolkit y consola admin, sin perder lo que ya construimos en corpus, PDFs locales y trazabilidad.</p>
+      <div class="quick-grid">
+        <a class="quick-item" href="/app/buscar">
+          <div>
+            <strong>Explorar normativa</strong>
+            <small>Circulares, oficios, resoluciones y judicial</small>
+          </div>
+          <span>&rsaquo;</span>
+        </a>
+        <a class="quick-item" href="/app/asistente">
+          <div>
+            <strong>Asistente tributario</strong>
+            <small>Preguntas fundadas solo con el corpus</small>
+          </div>
+          <span>&rsaquo;</span>
+        </a>
+        <a class="quick-item" href="/app/casos">
+          <div>
+            <strong>Guardados y casos</strong>
+            <small>Investigaciones privadas y notas</small>
+          </div>
+          <span>&rsaquo;</span>
+        </a>
+        <a class="quick-item" href="/admin">
+          <div>
+            <strong>Consola admin</strong>
+            <small>Scraping, QA y salud del corpus</small>
+          </div>
+          <span>&rsaquo;</span>
+        </a>
       </div>
     </section>
 
+    <div class="mini-stack">
+      <section class="mini-card">
+        <span class="badge info">Estado del corpus</span>
+        <h3 style="margin-top:14px;">Base canónica activa</h3>
+        <p>Última actualización registrada: <strong style="color:var(--text);">{{ ultima_actualizacion or 'Sin registro' }}</strong>. El corpus mantiene PDFs locales, texto completo y metadata técnica como base para la siguiente etapa del producto.</p>
+      </section>
+      <section class="mini-card">
+        <span class="badge warning">Distribución actual</span>
+        <p><strong style="color:var(--text);">{{ por_tipo.get('circular',0) }}</strong> circulares, <strong style="color:var(--text);">{{ por_tipo.get('oficio',0) }}</strong> oficios, <strong style="color:var(--text);">{{ por_tipo.get('resolucion',0) }}</strong> resoluciones y <strong style="color:var(--text);">{{ por_tipo.get('judicial',0) }}</strong> judiciales.</p>
+      </section>
+    </div>
+  </div>
+
+  <div class="section-grid">
     <section class="card">
-      <div class="card-head"><div class="card-title">Accesos rapidos</div></div>
-      <div class="card-body tight">
-        <div class="inline-actions" style="margin-bottom:10px;">
-          <a class="btn btn-secondary" href="/admin/scraper">Abrir scraping</a>
-          <a class="btn btn-secondary" href="/admin/ingestion">Ver ingestion</a>
-          <a class="btn btn-secondary" href="/agregar">Agregar manual</a>
+      <div class="card-head"><div class="card-title">Actividad reciente</div></div>
+      <div class="card-body">
+        {% if docs_recientes %}
+        <div class="recent-list">
+          {% for doc in docs_recientes %}
+          <a class="recent-item" href="/app/documento/{{ doc.id }}" style="text-decoration:none;">
+            <div class="recent-title">{{ doc.titulo }}</div>
+            <div class="recent-meta">{{ doc.referencia or (doc.tipo ~ ' ' ~ (doc.numero or '')) }} · {{ doc.fecha or doc.fecha_carga or '-' }}</div>
+            <div class="recent-copy">{{ (doc.resumen or doc.materia or doc.titulo)[:220] }}{% if (doc.resumen or doc.materia or doc.titulo)|length > 220 %}...{% endif %}</div>
+          </a>
+          {% endfor %}
         </div>
-        <div class="muted" style="font-size:13px;line-height:1.7;">Sprint 1 busca reordenar la navegacion, preparar RAG y habilitar la primera capa de casos sin tocar los scrapers que ya funcionan.</div>
+        {% else %}
+        <div class="empty-state">
+          <div class="empty-title">Sin documentos recientes</div>
+          <div class="empty-copy">Cuando el corpus vuelva a poblarse, aquí aparecerán las entradas más nuevas del sistema.</div>
+        </div>
+        {% endif %}
       </div>
     </section>
+
+    <div class="mini-stack">
+      <section class="card">
+        <div class="card-head"><div class="card-title">Investigaciones guardadas</div></div>
+        <div class="card-body tight">
+          {% if casos %}
+          <div class="saved-list">
+            {% for caso in casos[:3] %}
+            <a class="saved-item" href="/app/casos?caso={{ caso.id }}" style="text-decoration:none;">
+              <div class="saved-title">{{ caso.nombre }}</div>
+              <div class="saved-meta">{{ caso.estado }}</div>
+              <div class="saved-copy">Espacio listo para guardar consultas, documentos y notas de trabajo.</div>
+            </a>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div class="flash-inline">Todavía no hay casos privados creados. La nueva base deja este espacio listo para actuar como biblioteca de investigaciones y vaults por cliente.</div>
+          {% endif %}
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head"><div class="card-title">Artículos más citados</div></div>
+        <div class="card-body tight">
+          {% if top_arts %}
+          <div class="alert-list">
+            {% for item in top_arts[:4] %}
+            <div class="alert-item">
+              <div class="alert-title">{{ item.ley }} · {{ item.articulo }}</div>
+              <div class="alert-copy">{{ item.cnt }} referencias detectadas en el corpus indexado.</div>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div class="flash-inline">Cuando `articulos_idx` tenga actividad visible, este bloque servirá como entrada rápida a los temas más recurrentes.</div>
+          {% endif %}
+        </div>
+      </section>
+    </div>
   </div>
 </div>
 {% endblock %}

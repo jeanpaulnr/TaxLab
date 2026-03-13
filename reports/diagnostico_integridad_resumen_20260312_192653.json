@@ -1,0 +1,91 @@
+{
+  "resumen": {
+    "generated_at": "2026-03-12T19:26:53.759080",
+    "db_path": "C:\\Users\\jeanp\\Programas\\sii_normativa_v2.1\\data\\sii_normativa.db",
+    "desde": 2013,
+    "hasta": 2026,
+    "total_documentos": 306,
+    "por_tipo": [
+      {
+        "tipo": "circular",
+        "total": 306
+      }
+    ],
+    "documentos_contenido_vacio": 0,
+    "documentos_chars_cero": 0,
+    "documentos_sin_pdf": 0,
+    "documentos_paginas_cero": 0,
+    "documentos_sin_hash": 0,
+    "documentos_sin_pdf_size": 0,
+    "sospechosos_truncacion": 0,
+    "demasiado_cortos": 5
+  },
+  "por_anio": [
+    {
+      "tipo": "circular",
+      "anio": 2026,
+      "docs": 10,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 2706,
+      "avg_len": 9966.4,
+      "max_len": 40314
+    },
+    {
+      "tipo": "circular",
+      "anio": 2017,
+      "docs": 3,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 5476,
+      "avg_len": 7524.0,
+      "max_len": 8827
+    },
+    {
+      "tipo": "circular",
+      "anio": 2016,
+      "docs": 70,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 1483,
+      "avg_len": 46351.4,
+      "max_len": 749881
+    },
+    {
+      "tipo": "circular",
+      "anio": 2015,
+      "docs": 92,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 60,
+      "avg_len": 43035.4,
+      "max_len": 335053
+    },
+    {
+      "tipo": "circular",
+      "anio": 2014,
+      "docs": 70,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 59,
+      "avg_len": 21413.1,
+      "max_len": 156110
+    },
+    {
+      "tipo": "circular",
+      "anio": 2013,
+      "docs": 61,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 54,
+      "avg_len": 14260.4,
+      "max_len": 125725
+    }
+  ]
+}

@@ -115,6 +115,7 @@ CREATE TABLE IF NOT EXISTS articulos_idx (
 CREATE INDEX IF NOT EXISTS idx_art_ley ON articulos_idx(ley, articulo);
 CREATE INDEX IF NOT EXISTS idx_doc_tipo ON documentos(tipo, anio);
 CREATE INDEX IF NOT EXISTS idx_doc_hash ON documentos(hash_md5);
+CREATE INDEX IF NOT EXISTS idx_doc_fuente ON documentos(fuente);
 CREATE TABLE IF NOT EXISTS judicial_docs (
     doc_id      INTEGER PRIMARY KEY REFERENCES documentos(id) ON DELETE CASCADE,
     sii_id      INTEGER UNIQUE,
@@ -159,7 +160,7 @@ CREATE TABLE IF NOT EXISTS scheduler_config (
 """
 
 MATERIAS_FALLBACK = []
-LEYES = ['LIR', 'LIVS', 'CT', 'LTE', 'LH', 'LMT', 'LRT']
+LEYES_FALLBACK = ['LIR', 'LIVS', 'CT', 'LTE', 'LH', 'LMT', 'LRT']
 
 
 def get_asset_path(stored_path):
@@ -287,6 +288,53 @@ def get_case_options(conn=None):
             conn.close()
 
 
+def get_catalog_laws(conn):
+    leyes = set()
+
+    try:
+        rows = conn.execute(
+            """
+            SELECT DISTINCT ley
+            FROM articulos_idx
+            WHERE ley IS NOT NULL AND trim(ley) <> ''
+            ORDER BY ley
+            """
+        ).fetchall()
+        leyes.update(row[0] for row in rows if row[0])
+    except sqlite3.OperationalError:
+        pass
+
+    try:
+        rows = conn.execute(
+            """
+            SELECT leyes_citadas
+            FROM documentos
+            WHERE leyes_citadas IS NOT NULL AND trim(leyes_citadas) <> ''
+            """
+        ).fetchall()
+        for row in rows:
+            leyes.update(value for value in safe_json_loads(row[0]) if value)
+    except sqlite3.OperationalError:
+        pass
+
+    return sorted(leyes) or list(LEYES_FALLBACK)
+
+
+def get_catalog_sources(conn):
+    try:
+        rows = conn.execute(
+            """
+            SELECT DISTINCT fuente
+            FROM documentos
+            WHERE fuente IS NOT NULL AND trim(fuente) <> ''
+            ORDER BY fuente
+            """
+        ).fetchall()
+        return [row[0] for row in rows if row[0]]
+    except sqlite3.OperationalError:
+        return []
+
+
 def get_catalog_context():
     conn = get_db()
     try:
@@ -302,6 +350,16 @@ def get_catalog_context():
 
         c.execute('SELECT termino, resultados FROM historial ORDER BY fecha DESC LIMIT 8')
         recientes = [dict(row) for row in c.fetchall()]
+
+        c.execute(
+            """
+            SELECT id, tipo, numero, anio, fecha, fecha_carga, titulo, materia, resumen, referencia
+            FROM documentos
+            ORDER BY datetime(COALESCE(fecha_carga, fecha)) DESC, id DESC
+            LIMIT 6
+            """
+        )
+        docs_recientes = [dict(row) for row in c.fetchall()]
 
         c.execute('SELECT ley, articulo, COUNT(*) cnt FROM articulos_idx GROUP BY ley, articulo ORDER BY cnt DESC LIMIT 15')
         top_arts = [dict(row) for row in c.fetchall()]
@@ -331,9 +389,11 @@ def get_catalog_context():
             'por_tipo': por_tipo,
             'por_anio': por_anio,
             'recientes': recientes,
+            'docs_recientes': docs_recientes,
             'top_arts': top_arts,
             'materias': materias,
-            'leyes': LEYES,
+            'leyes': get_catalog_laws(conn),
+            'fuentes': get_catalog_sources(conn),
             'cortes_judiciales': cortes_judiciales,
             'cuerpos_judiciales': cuerpos_judiciales,
             'anio_actual': date.today().year,
@@ -548,7 +608,8 @@ def get_doc_preview(doc_id):
 
 @app.route('/')
 def index():
-    return redirect(url_for('app_search'))
+    context = get_catalog_context()
+    return render_template('landing.html', **context)
 
 
 @app.route('/app')
@@ -560,6 +621,21 @@ def app_dashboard():
         page_title='TaxLab IA',
         page_subtitle='Dashboard inicial para separar base publica SII, asistente con evidencia, casos privados, toolkit y paneles admin sin romper el producto actual.',
         **context,
+    )
+
+
+@app.route('/admin')
+def admin_dashboard():
+    catalog_context = get_catalog_context()
+    scraper_context = load_scraper_context()
+    merged_context = dict(catalog_context)
+    merged_context.update(scraper_context)
+    return render_app(
+        'admin_dashboard.html',
+        active_section='admin_dashboard',
+        page_title='Admin Console',
+        page_subtitle='Vista ejecutiva para controlar scraping, salud operativa e integridad del corpus sin mezclarla con la experiencia de usuario.',
+        **merged_context,
     )
 
 
@@ -585,6 +661,7 @@ def buscar():
     articulo = request.args.get('articulo', '').strip()
     corte = request.args.get('corte', '').strip()
     cuerpo = request.args.get('cuerpo', '').strip()
+    fuente = request.args.get('fuente', '').strip()
     vigente = request.args.get('vigente', '').strip()
     page = max(1, int(request.args.get('page', 1)))
     per = 15
@@ -632,6 +709,9 @@ def buscar():
         if cuerpo:
             where.append('jr.cuerpo_normativo = ?')
             params.append(cuerpo)
+        if fuente:
+            where.append('d.fuente = ?')
+            params.append(fuente)
         if vigente in ('0', '1'):
             where.append('d.vigente = ?')
             params.append(int(vigente))
@@ -644,7 +724,7 @@ def buscar():
 
         c.execute(
             f"""
-            SELECT d.id, d.tipo, d.numero, d.anio, d.fecha, d.titulo, d.materia,
+            SELECT d.id, d.tipo, d.numero, d.anio, d.fecha, d.titulo, d.materia, d.fuente,
                    d.referencia, d.resumen, d.leyes_citadas, d.articulos_clave,
                    d.vigente, d.paginas, d.chars_texto, d.url_sii,
                    jd.corte, jd.tribunal, jd.tipo_codigo, COALESCE(d.pdf_local, jd.pdf_local) AS pdf_local,
@@ -673,6 +753,7 @@ def buscar():
                             'articulo': articulo,
                             'corte': corte,
                             'cuerpo': cuerpo,
+                            'fuente': fuente,
                             'vigente': vigente,
                         }),
                         total,
@@ -711,6 +792,7 @@ def buscar():
             'tribunal': row['tribunal'],
             'tipo_codigo': row['tipo_codigo'],
             'cuerpos_normativos': cuerpos_normativos,
+            'fuente': row['fuente'] if 'fuente' in row.keys() else '',
             'pdf_url': f"/documento/{row['id']}/pdf" if row['pdf_local'] else '',
         })
 
@@ -736,7 +818,7 @@ def app_documento(doc_id):
         'documento.html',
         active_section='buscar',
         page_title='Detalle documental',
-        page_subtitle='Ficha canonica del documento con citas, relacionados, fuente y opciones de guardado en casos.',
+        page_subtitle='Ficha canónica del documento con citas, relacionados, fuente y opciones de guardado en casos.',
         total=catalog_context['total'],
         casos=catalog_context['casos'],
         anio_actual=catalog_context['anio_actual'],
@@ -802,13 +884,13 @@ def cita(doc_id):
 
     return jsonify({
         'cita_corta': f'{tipo_nombre} N{doc.get("numero", "")} de {doc.get("anio", "")} del SII',
-        'cita_media': f'Conforme a lo senalado por el SII en {tipo_nombre} N{doc.get("numero", "")} de {doc.get("anio", "")}, en materia de {materia}',
+        'cita_media': f'Conforme a lo señalado por el SII en {tipo_nombre} N{doc.get("numero", "")} de {doc.get("anio", "")}, en materia de {materia}',
         'cita_larga': (
             f'En virtud de lo establecido en {tipo_nombre} N{doc.get("numero", "")} de fecha {fecha_fmt}, '
-            f'emanada del Servicio de Impuestos Internos, en materia de {materia}, dicho organismo ha senalado que: "{resumen_txt}..."'
+            f'emanada del Servicio de Impuestos Internos, en materia de {materia}, dicho organismo ha señalado que: "{resumen_txt}..."'
         ),
         'cita_escrito': (
-            f'En este contexto, cabe traer a colacion lo senalado por el SII en su {tipo_nombre} N{doc.get("numero", "")} '
+            f'En este contexto, cabe traer a colación lo señalado por el SII en su {tipo_nombre} N{doc.get("numero", "")} '
             f'de {doc.get("anio", "")} (ref. {doc.get("referencia", "")}), donde se establece que: "{resumen_txt}...". '
             f'Dicha instruccion administrativa se encuentra disponible en {doc.get("url_sii", "www.sii.cl")}. '
         ),
@@ -1118,7 +1200,7 @@ def iniciar_scraper():
             for anio in range(anio_hasta, anio_desde - 1, -1):
                 push_msg(f'--- Iniciando {tipo.upper()} {anio} ---', True)
                 result = scrape_anio(tipo, anio, callback=push_msg, delay=delay)
-                push_msg(f'Anio {anio} completado - {result.get("nuevos", 0)} nuevos, {result.get("errores", 0)} errores', True)
+            push_msg(f'Año {anio} completado - {result.get("nuevos", 0)} nuevos, {result.get("errores", 0)} errores', True)
         except Exception as exc:
             push_msg(f'ERROR CRITICO: {exc}', False)
         finally:
@@ -1249,7 +1331,7 @@ def agregar():
         numero = (data.get('numero') or '').strip()
         pdf_local, pdf_hash, pdf_size = build_manual_pdf(anio, tipo, numero, data.get('titulo', ''), contenido)
         if not pdf_local:
-            return jsonify({'ok': False, 'error': 'No fue posible generar el PDF canonico del documento manual'})
+            return jsonify({'ok': False, 'error': 'No fue posible generar el PDF canónico del documento manual'})
 
         data['hash_md5'] = pdf_hash
         data['anio'] = anio

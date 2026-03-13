@@ -48,6 +48,7 @@
 .result-ref{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);text-align:right}
 .result-title{font-family:'Crimson Pro',serif;font-size:24px;font-weight:700;line-height:1.16;cursor:pointer}
 .result-title:hover{color:var(--accent)}
+.result-context{margin-top:8px;font-size:13px;line-height:1.7;color:var(--muted)}
 .result-materia{margin-top:6px;color:var(--muted);font-size:13px;font-style:italic}
 .result-meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
 .meta-chip{padding:5px 9px;border-radius:999px;border:1px solid var(--line);background:var(--panel-2);font-family:'DM Mono',monospace;font-size:10px;color:var(--text-soft)}
@@ -109,7 +110,7 @@
             <option value="judicial">Jurisprudencia judicial</option>
           </select>
         </div>
-        <div class="field"><label class="label">Anio</label>
+        <div class="field"><label class="label">A&ntilde;o</label>
           <select id="f-anio" class="select" onchange="buscar(1)">
             <option value="">Todos</option>
             {% for a in range(anio_actual,1989,-1) %}
@@ -353,6 +354,13 @@ async function buscar(p=1){
     const leyes = (r.leyes || []).map((ley) => `<span class="badge">${ley}</span>`).join('');
     const articulos = (r.articulos || []).map((art) => `<span class="tag" onclick="filtrarArtTag('${String(art).replaceAll("'", "\\'")}')">${art}</span>`).join('');
     const cuerpos = (r.cuerpos_normativos || []).slice(0, 3).map((cuerpo) => `<span class="meta-chip">${cuerpo}</span>`).join('');
+    const referenciaPrincipal = r.referencia || r.titulo || '';
+    const tituloSecundario = r.titulo && r.referencia && r.titulo !== r.referencia
+      ? `<div class="result-context">${r.titulo}</div>`
+      : '';
+    const referenciaCruzada = r.tipo !== 'circular' && /Circular N/i.test(r.titulo || '')
+      ? '<span class="badge warning">Referencia a circular</span>'
+      : '';
     const judicialMeta = r.tipo === 'judicial'
       ? `<div class="result-meta">${r.corte ? `<span class="meta-chip">${r.corte}</span>` : ''}${r.tribunal ? `<span class="meta-chip">${r.tribunal}</span>` : ''}${cuerpos}</div>`
       : '';
@@ -363,11 +371,12 @@ async function buscar(p=1){
         <div class="result-body">
           <div class="result-top">
             <div>
-              <div class="result-badges"><span class="badge info">${r.tipo}</span>${leyes}${vigente}</div>
+              <div class="result-badges"><span class="badge info">${r.tipo}</span>${referenciaCruzada}${leyes}${vigente}</div>
             </div>
-            <div class="result-ref">${r.referencia || ''}</div>
+            <div class="result-ref">${r.anio ? `Año ${r.anio}` : ''}</div>
           </div>
-          <div class="result-title" onclick="location.href='/app/documento/${r.id}'">${r.titulo}</div>
+          <div class="result-title" onclick="location.href='/app/documento/${r.id}'">${referenciaPrincipal}</div>
+          ${tituloSecundario}
           ${r.materia ? `<div class="result-materia">${r.materia}</div>` : ''}
           ${judicialMeta}
           <div class="result-extract">${r.extracto || ''}</div>

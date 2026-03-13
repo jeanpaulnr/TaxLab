@@ -1,0 +1,26 @@
+{
+  "source_url": "https://www.sii.cl/documentos/circulares/2009/circu39.htm",
+  "document_id": "2009_circu39",
+  "fetched_at": "2026-03-12T22:40:09",
+  "header": {
+    "titulo_html": "Circular Nº 39 del 25 de Junio del 2009",
+    "materia_html": "Complementa instrucciones contenidas en Circular Nº 52 de 15 de Septiembre de 2008, sobre modificaciones introducidas al Art. 21°, del D.L. Nº 910, de 1975, por el Art. 5°, de la Ley 20.259.",
+    "texto": "Circular Nº 39 del 25 de Junio del 2009\nMATERIA: Complementa instrucciones contenidas en Circular Nº 52 de 15 de Septiembre de 2008, sobre modificaciones introducidas al Art. 21°, del D.L. Nº 910, de 1975, por el Art. 5°, de la Ley 20.259."
+  },
+  "pages": [
+    {
+      "page_index": 1,
+      "image_url": "https://www.sii.cl/documentos/circulares/2009/circu39.gif",
+      "original_image_path": "img_historico/2009/2009_circu39_01.gif",
+      "ocr_engine_used": "tesseract",
+      "raw_text": "25.590 1.551\nValor Total del Crédito\nContrato Potencial\nGeneral de Total\nConstrucción",
+      "normalized_text": "25.590 1.551 Valor Total del Crédito Contrato Potencial General de Total Construcción",
+      "confidence": null
+    }
+  ],
+  "full_text_raw": "Circular Nº 39 del 25 de Junio del 2009\nMATERIA: Complementa instrucciones contenidas en Circular Nº 52 de 15 de Septiembre de 2008, sobre modificaciones introducidas al Art. 21°, del D.L. Nº 910, de 1975, por el Art. 5°, de la Ley 20.259.\n\n[PAGINA 1]\n25.590 1.551\nValor Total del Crédito\nContrato Potencial\nGeneral de Total\nConstrucción",
+  "full_text_normalized": "Circular Nº 39 del 25 de Junio del 2009\nMATERIA: Complementa instrucciones contenidas en Circular Nº 52 de 15 de Septiembre de 2008, sobre modificaciones introducidas al Art. 21°, del D.L. Nº 910, de 1975, por el Art. 5°, de la Ley 20.259.\n\n[PAGINA 1]\n25.590 1.551 Valor Total del Crédito Contrato Potencial General de Total Construcción",
+  "pdf_local": "pdfs/circular/2009/circular_historica_2009_circu39_scan.pdf",
+  "html_original": "html_historico/2009/2009_circu39_original.html",
+  "html_limpio": "html_historico/2009/2009_circu39_limpio.html"
+}

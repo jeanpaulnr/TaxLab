@@ -1,0 +1,44 @@
+{
+  "source_url": "https://www.sii.cl/documentos/circulares/2010/circu05.htm",
+  "document_id": "2010_circu05",
+  "fetched_at": "2026-03-12T22:38:53",
+  "header": {
+    "titulo_html": "Circular Nº 05 del 12 de Enero del 2010",
+    "materia_html": "Imparte Instrucciones Sobre las Modificaciones Introducidas a la Ley Nº 19.764, por los Artículos 3° y Segundo y Tercero Transitorios de la Ley Nº 20.360, Referidos a la Recuperación por las Empresas de Transporte de Carga Internacional del Impuesto Específico al Petróleo Diesel y al Aumento Transitorio de la Tasa de Recuperación del Mismo Tributo.",
+    "texto": "Circular Nº 05 del 12 de Enero del 2010\nMATERIA: Imparte Instrucciones Sobre las Modificaciones Introducidas a la Ley Nº 19.764, por los Artículos 3° y Segundo y Tercero Transitorios de la Ley Nº 20.360, Referidos a la Recuperación por las Empresas de Transporte de Carga Internacional del Impuesto Específico al Petróleo Diesel y al Aumento Transitorio de la Tasa de Recuperación del Mismo Tributo."
+  },
+  "pages": [
+    {
+      "page_index": 1,
+      "image_url": "https://www.sii.cl/documentos/circulares/2010/circu05_a.gif",
+      "original_image_path": "img_historico/2010/2010_circu05_01.gif",
+      "ocr_engine_used": "tesseract",
+      "raw_text": "Suma de ingresos limas 12 meses — á > Manto\nMeses que registra ingresos efecinos POCIÓN mensa 12 = Proyeccién de ingresosa 12",
+      "normalized_text": "Suma de ingresos limas 12 meses — á > Manto Meses que registra ingresos efecinos POCIÓN mensa 12 = Proyeccién de ingresosa 12",
+      "confidence": null
+    },
+    {
+      "page_index": 2,
+      "image_url": "https://www.sii.cl/documentos/circulares/2010/circu05_b.gif",
+      "original_image_path": "img_historico/2010/2010_circu05_02.gif",
+      "ocr_engine_used": "tesseract",
+      "raw_text": "Mar Abr May Jun Jul Ago Sep Oct Nov Dic Ene Feb| Ingresos\n100 0 0.0.0 o 50 0.0.0 0150 300",
+      "normalized_text": "Mar Abr May Jun Jul Ago Sep Oct Nov Dic Ene Feb| Ingresos 100 0 0.0.0 o 50 0.0.0 0150 300",
+      "confidence": null
+    },
+    {
+      "page_index": 3,
+      "image_url": "https://www.sii.cl/documentos/circulares/2010/circu05_c.gif",
+      "original_image_path": "img_historico/2010/2010_circu05_03.gif",
+      "ocr_engine_used": "tesseract",
+      "raw_text": "22-100 x 12 = 1200",
+      "normalized_text": "22-100 x 12 = 1200",
+      "confidence": null
+    }
+  ],
+  "full_text_raw": "Circular Nº 05 del 12 de Enero del 2010\nMATERIA: Imparte Instrucciones Sobre las Modificaciones Introducidas a la Ley Nº 19.764, por los Artículos 3° y Segundo y Tercero Transitorios de la Ley Nº 20.360, Referidos a la Recuperación por las Empresas de Transporte de Carga Internacional del Impuesto Específico al Petróleo Diesel y al Aumento Transitorio de la Tasa de Recuperación del Mismo Tributo.\n\n[PAGINA 1]\nSuma de ingresos limas 12 meses — á > Manto\nMeses que registra ingresos efecinos POCIÓN mensa 12 = Proyeccién de ingresosa 12\n\n[PAGINA 2]\nMar Abr May Jun Jul Ago Sep Oct Nov Dic Ene Feb| Ingresos\n100 0 0.0.0 o 50 0.0.0 0150 300\n\n[PAGINA 3]\n22-100 x 12 = 1200",
+  "full_text_normalized": "Circular Nº 05 del 12 de Enero del 2010\nMATERIA: Imparte Instrucciones Sobre las Modificaciones Introducidas a la Ley Nº 19.764, por los Artículos 3° y Segundo y Tercero Transitorios de la Ley Nº 20.360, Referidos a la Recuperación por las Empresas de Transporte de Carga Internacional del Impuesto Específico al Petróleo Diesel y al Aumento Transitorio de la Tasa de Recuperación del Mismo Tributo.\n\n[PAGINA 1]\nSuma de ingresos limas 12 meses — á > Manto Meses que registra ingresos efecinos POCIÓN mensa 12 = Proyeccién de ingresosa 12\n\n[PAGINA 2]\nMar Abr May Jun Jul Ago Sep Oct Nov Dic Ene Feb| Ingresos 100 0 0.0.0 o 50 0.0.0 0150 300\n\n[PAGINA 3]\n22-100 x 12 = 1200",
+  "pdf_local": "pdfs/circular/2010/circular_historica_2010_circu05_scan.pdf",
+  "html_original": "html_historico/2010/2010_circu05_original.html",
+  "html_limpio": "html_historico/2010/2010_circu05_limpio.html"
+}

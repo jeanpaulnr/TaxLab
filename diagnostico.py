@@ -1,101 +1,287 @@
+# -*- coding: utf-8 -*-
 """
-SII Normativa — Diagnóstico completo
-Corre desde la raíz del proyecto: python diagnostico.py
+SII Normativa - Diagnostico completo
+Corre desde la raiz del proyecto: python diagnostico.py
 """
-import sqlite3, os, requests
+
+import os
+import sqlite3
+import requests
 
 BASE = os.path.dirname(os.path.abspath(__file__))
-DB   = os.path.join(BASE, 'data', 'sii_normativa.db')
+DB = os.path.join(BASE, "data", "sii_normativa.db")
+LOGS = os.path.join(BASE, "logs")
+os.makedirs(LOGS, exist_ok=True)
+
+
+OFICIO_CASE_SQL = """
+CASE
+    WHEN tipo = 'oficio' AND UPPER(COALESCE(subtema, '')) LIKE 'RENTA%' THEN 'oficio / LIR'
+    WHEN tipo = 'oficio' AND UPPER(COALESCE(subtema, '')) LIKE 'IVA%' THEN 'oficio / IVA'
+    WHEN tipo = 'oficio' AND (
+        UPPER(COALESCE(subtema, '')) LIKE 'OTRAS%' OR
+        UPPER(COALESCE(subtema, '')) LIKE 'OTROS%'
+    ) THEN 'oficio / OTRAS NORMAS'
+    WHEN tipo = 'oficio' THEN 'oficio / SIN SUBCLASIFICAR'
+    ELSE tipo
+END
+"""
+
+
+def print_header(title):
+    print("\n" + "=" * 70)
+    print(f"  {title}")
+    print("=" * 70)
+
+
+def print_kv_row(label, value):
+    print(f"   {label:28s} -> {value}")
+
 
 conn = sqlite3.connect(DB)
 conn.row_factory = sqlite3.Row
 c = conn.cursor()
 
 print("=" * 70)
-print("  DIAGNÓSTICO SII NORMATIVA")
+print("  DIAGNOSTICO SII NORMATIVA")
 print("=" * 70)
 
 # 1. Total
-c.execute("SELECT COUNT(*) FROM documentos")
-print(f"\n📊 TOTAL DOCUMENTOS: {c.fetchone()[0]}")
+c.execute("SELECT COUNT(*) AS total FROM documentos")
+print(f"\nTOTAL DOCUMENTOS: {c.fetchone()['total']:,}")
 
-# 2. Por tipo
-print("\n📋 POR TIPO:")
-c.execute("SELECT tipo, COUNT(*) cnt FROM documentos GROUP BY tipo ORDER BY cnt DESC")
+# 2. Por tipo principal
+print("\nPOR TIPO:")
+c.execute(
+    """
+    SELECT tipo, COUNT(*) AS cnt
+    FROM documentos
+    GROUP BY tipo
+    ORDER BY cnt DESC, tipo
+    """
+)
 for r in c.fetchall():
-    print(f"   {r['tipo']:20s} → {r['cnt']:,}")
+    print_kv_row(r["tipo"], f"{r['cnt']:,}")
 
-# 3. Por tipo y año
-print("\n📅 POR TIPO Y AÑO:")
-c.execute("""
-    SELECT tipo, anio, COUNT(*) cnt 
-    FROM documentos 
-    GROUP BY tipo, anio 
-    ORDER BY tipo, anio DESC
-""")
+# 3. Por subclasificacion (oficios abiertos en ramas)
+print("\nPOR SUBCLASIFICACION:")
+c.execute(
+    f"""
+    SELECT {OFICIO_CASE_SQL} AS tipo_detalle, COUNT(*) AS cnt
+    FROM documentos
+    GROUP BY tipo_detalle
+    ORDER BY
+        CASE
+            WHEN tipo_detalle = 'circular' THEN 1
+            WHEN tipo_detalle = 'resolucion' THEN 2
+            WHEN tipo_detalle = 'judicial' THEN 3
+            WHEN tipo_detalle = 'oficio / LIR' THEN 4
+            WHEN tipo_detalle = 'oficio / IVA' THEN 5
+            WHEN tipo_detalle = 'oficio / OTRAS NORMAS' THEN 6
+            WHEN tipo_detalle = 'oficio / SIN SUBCLASIFICAR' THEN 7
+            ELSE 99
+        END,
+        tipo_detalle
+    """
+)
 for r in c.fetchall():
-    print(f"   {r['tipo']:20s} {r['anio']}  → {r['cnt']:>5,}")
+    print_kv_row(r["tipo_detalle"], f"{r['cnt']:,}")
 
-# 4. Oficios OTRAS
-print("\n🔍 OFICIOS 'OTRAS NORMAS':")
-c.execute("SELECT COUNT(*) FROM documentos WHERE subtema LIKE '%OTRAS%'")
-print(f"   Con subtema OTRAS: {c.fetchone()[0]}")
-c.execute("SELECT DISTINCT substr(subtema,1,30) as sub FROM documentos WHERE tipo='oficio' LIMIT 10")
-print("   Subtemas encontrados en oficios:")
+# 4. Por subclasificacion y anio
+print("\nPOR SUBCLASIFICACION Y ANIO:")
+c.execute(
+    f"""
+    SELECT {OFICIO_CASE_SQL} AS tipo_detalle, anio, COUNT(*) AS cnt
+    FROM documentos
+    GROUP BY tipo_detalle, anio
+    ORDER BY
+        CASE
+            WHEN tipo_detalle = 'circular' THEN 1
+            WHEN tipo_detalle = 'resolucion' THEN 2
+            WHEN tipo_detalle = 'judicial' THEN 3
+            WHEN tipo_detalle = 'oficio / LIR' THEN 4
+            WHEN tipo_detalle = 'oficio / IVA' THEN 5
+            WHEN tipo_detalle = 'oficio / OTRAS NORMAS' THEN 6
+            WHEN tipo_detalle = 'oficio / SIN SUBCLASIFICAR' THEN 7
+            ELSE 99
+        END,
+        anio DESC
+    """
+)
 for r in c.fetchall():
-    print(f"     - {r['sub']}")
+    anio = r["anio"] if r["anio"] is not None else "NULL"
+    print(f"   {r['tipo_detalle']:28s} {anio} -> {r['cnt']:>5,}")
 
-# 5. Ejemplos de documentos
-print("\n📄 EJEMPLO CIRCULAR:")
-c.execute("""SELECT id,tipo,numero,anio,fecha,substr(titulo,1,80) titulo,
-             substr(resumen,1,120) resumen, leyes_citadas, articulos_clave
-             FROM documentos WHERE tipo='circular' ORDER BY anio DESC LIMIT 1""")
+# 5. Desglose especifico de oficios
+print("\nOFICIOS POR RAMA:")
+c.execute(
+    """
+    SELECT
+        CASE
+            WHEN UPPER(COALESCE(subtema, '')) LIKE 'RENTA%' THEN 'LIR'
+            WHEN UPPER(COALESCE(subtema, '')) LIKE 'IVA%' THEN 'IVA'
+            WHEN UPPER(COALESCE(subtema, '')) LIKE 'OTRAS%' OR UPPER(COALESCE(subtema, '')) LIKE 'OTROS%' THEN 'OTRAS NORMAS'
+            ELSE 'SIN SUBCLASIFICAR'
+        END AS rama,
+        COUNT(*) AS cnt
+    FROM documentos
+    WHERE tipo = 'oficio'
+    GROUP BY rama
+    ORDER BY
+        CASE rama
+            WHEN 'LIR' THEN 1
+            WHEN 'IVA' THEN 2
+            WHEN 'OTRAS NORMAS' THEN 3
+            ELSE 99
+        END
+    """
+)
+for r in c.fetchall():
+    print_kv_row(r["rama"], f"{r['cnt']:,}")
+
+print("\nOFICIOS POR RAMA Y ANIO:")
+c.execute(
+    """
+    SELECT
+        CASE
+            WHEN UPPER(COALESCE(subtema, '')) LIKE 'RENTA%' THEN 'LIR'
+            WHEN UPPER(COALESCE(subtema, '')) LIKE 'IVA%' THEN 'IVA'
+            WHEN UPPER(COALESCE(subtema, '')) LIKE 'OTRAS%' OR UPPER(COALESCE(subtema, '')) LIKE 'OTROS%' THEN 'OTRAS NORMAS'
+            ELSE 'SIN SUBCLASIFICAR'
+        END AS rama,
+        anio,
+        COUNT(*) AS cnt
+    FROM documentos
+    WHERE tipo = 'oficio'
+    GROUP BY rama, anio
+    ORDER BY
+        CASE rama
+            WHEN 'LIR' THEN 1
+            WHEN 'IVA' THEN 2
+            WHEN 'OTRAS NORMAS' THEN 3
+            ELSE 99
+        END,
+        anio DESC
+    """
+)
+for r in c.fetchall():
+    anio = r["anio"] if r["anio"] is not None else "NULL"
+    print(f"   {'oficio / ' + r['rama']:28s} {anio} -> {r['cnt']:>5,}")
+
+# 6. Ejemplos de documentos
+print("\nEJEMPLO CIRCULAR:")
+c.execute(
+    """
+    SELECT id, tipo, numero, anio, fecha, substr(titulo,1,80) AS titulo,
+           substr(resumen,1,120) AS resumen, leyes_citadas, articulos_clave
+    FROM documentos
+    WHERE tipo='circular'
+    ORDER BY anio DESC, CAST(numero AS INTEGER) DESC
+    LIMIT 1
+    """
+)
 r = c.fetchone()
 if r:
-    for k in r.keys(): print(f"   {k}: {r[k]}")
+    for k in r.keys():
+        print(f"   {k}: {r[k]}")
 
-print("\n📄 EJEMPLO OFICIO:")
-c.execute("""SELECT id,tipo,numero,anio,fecha,substr(titulo,1,80) titulo,
-             substr(resumen,1,120) resumen, leyes_citadas, articulos_clave
-             FROM documentos WHERE tipo='oficio' ORDER BY anio DESC LIMIT 1""")
+for rama, patron in (
+    ("OFICIO LIR", "RENTA%"),
+    ("OFICIO IVA", "IVA%"),
+    ("OFICIO OTRAS NORMAS", "OTRAS%"),
+):
+    print(f"\nEJEMPLO {rama}:")
+    c.execute(
+        """
+        SELECT id, tipo, numero, anio, fecha, substr(titulo,1,80) AS titulo,
+               substr(resumen,1,120) AS resumen, subtema, leyes_citadas, articulos_clave
+        FROM documentos
+        WHERE tipo='oficio' AND UPPER(COALESCE(subtema,'')) LIKE ?
+        ORDER BY anio DESC, CAST(numero AS INTEGER) DESC
+        LIMIT 1
+        """,
+        (patron,),
+    )
+    r = c.fetchone()
+    if r:
+        for k in r.keys():
+            print(f"   {k}: {r[k]}")
+    else:
+        print("   SIN REGISTROS")
+
+print("\nEJEMPLO RESOLUCION:")
+c.execute(
+    """
+    SELECT id, tipo, numero, anio, fecha, substr(titulo,1,80) AS titulo
+    FROM documentos
+    WHERE tipo='resolucion'
+    ORDER BY anio DESC, CAST(numero AS INTEGER) DESC
+    LIMIT 1
+    """
+)
 r = c.fetchone()
 if r:
-    for k in r.keys(): print(f"   {k}: {r[k]}")
-
-print("\n📄 EJEMPLO RESOLUCIÓN:")
-c.execute("""SELECT id,tipo,numero,anio,fecha,substr(titulo,1,80) titulo
-             FROM documentos WHERE tipo='resolucion' LIMIT 1""")
-r = c.fetchone()
-if r:
-    for k in r.keys(): print(f"   {k}: {r[k]}")
+    for k in r.keys():
+        print(f"   {k}: {r[k]}")
 else:
-    print("   ⚠ NO HAY RESOLUCIONES EN LA BASE")
+    print("   NO HAY RESOLUCIONES EN LA BASE")
 
-# 6. Oficios LIR 2025 - errores
-print("\n🔍 SCRAPER LOG — OFICIOS LIR 2025:")
+print("\nEJEMPLO JUDICIAL:")
+c.execute(
+    """
+    SELECT id, tipo, numero, anio, fecha, substr(titulo,1,80) AS titulo,
+           substr(resumen,1,120) AS resumen
+    FROM documentos
+    WHERE tipo='judicial'
+    ORDER BY anio DESC, id DESC
+    LIMIT 1
+    """
+)
+r = c.fetchone()
+if r:
+    for k in r.keys():
+        print(f"   {k}: {r[k]}")
+else:
+    print("   NO HAY JURISPRUDENCIA JUDICIAL EN LA BASE")
+
+# 7. Scraper log por rama de oficios
+print("\nSCRAPER LOG - OFICIOS 2025:")
 try:
-    c.execute("""SELECT estado, COUNT(*) cnt FROM scraper_log 
-                 WHERE tipo='oficio_lir' AND anio=2025 GROUP BY estado""")
-    for r in c.fetchall():
-        print(f"   {r['estado']:20s} → {r['cnt']}")
-except:
+    for tipo_log in ("oficio_lir", "oficio_iva", "oficio_otras"):
+        print(f"   {tipo_log}:")
+        c.execute(
+            """
+            SELECT estado, COUNT(*) AS cnt
+            FROM scraper_log
+            WHERE tipo=? AND anio=2025
+            GROUP BY estado
+            ORDER BY cnt DESC, estado
+            """,
+            (tipo_log,),
+        )
+        rows = c.fetchall()
+        if not rows:
+            print("     (sin eventos)")
+        for r in rows:
+            print(f"     {r['estado']:20s} -> {r['cnt']}")
+except Exception:
     print("   (tabla scraper_log no disponible)")
 
-# 7. Probar URLs de resoluciones
-print("\n🌐 PROBANDO URLs DE RESOLUCIONES:")
+# 8. Probar URLs de resoluciones
+print("\nPROBANDO URLs DE RESOLUCIONES:")
 urls_test = [
-    ("indres2025.htm (estándar)", "https://www.sii.cl/normativa_legislacion/resoluciones/2025/indres2025.htm"),
+    ("indres2025.htm (estandar)", "https://www.sii.cl/normativa_legislacion/resoluciones/2025/indres2025.htm"),
     ("indres2024.htm", "https://www.sii.cl/normativa_legislacion/resoluciones/2024/indres2024.htm"),
     ("indres2023.htm", "https://www.sii.cl/normativa_legislacion/resoluciones/2023/indres2023.htm"),
     ("indreso2025.htm (variante)", "https://www.sii.cl/normativa_legislacion/resoluciones/2025/indreso2025.htm"),
-    ("sin subcarpeta año", "https://www.sii.cl/normativa_legislacion/resoluciones/indres2025.htm"),
-    ("página principal resol", "https://www.sii.cl/normativa_legislacion/resoluciones.htm"),
+    ("sin subcarpeta anio", "https://www.sii.cl/normativa_legislacion/resoluciones/indres2025.htm"),
+    ("pagina principal resol", "https://www.sii.cl/normativa_legislacion/resoluciones.htm"),
     ("jurisprudencia admin", "https://www.sii.cl/normativa_legislacion/jurisprudencia_administrativa/"),
-    ("índice jadm", "https://www.sii.cl/normativa_legislacion/jurisprudencia_administrativa/indice_jadm.htm"),
+    ("indice jadm", "https://www.sii.cl/normativa_legislacion/jurisprudencia_administrativa/indice_jadm.htm"),
 ]
 
 headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
 }
 
 for nombre, url in urls_test:
@@ -103,23 +289,29 @@ for nombre, url in urls_test:
         r = requests.get(url, headers=headers, timeout=10, allow_redirects=True)
         status = r.status_code
         size = len(r.content)
-        has_pdf = 'reso' in r.text.lower()[:5000] if status == 200 else False
-        print(f"   {status}  {size:>8,} bytes  pdf_links={'SÍ' if has_pdf else 'NO':3s}  {nombre}")
+        has_pdf = "reso" in r.text.lower()[:5000] if status == 200 else False
+        print(f"   {status}  {size:>8,} bytes  pdf_links={'SI' if has_pdf else 'NO':3s}  {nombre}")
         if status == 200 and size > 500:
-            # Guardar para inspección
-            fname = nombre.replace(" ", "_").replace("/","_").replace("(","").replace(")","")[:30] + ".html"
-            with open(os.path.join(BASE, 'logs', fname), 'w', encoding='utf-8') as f:
+            fname = (
+                nombre.replace(" ", "_")
+                .replace("/", "_")
+                .replace("(", "")
+                .replace(")", "")[:30]
+                + ".html"
+            )
+            with open(os.path.join(LOGS, fname), "w", encoding="utf-8") as f:
                 f.write(r.text[:10000])
     except Exception as e:
         print(f"   ERR  {nombre}: {e}")
 
-# 8. Schema actual
-print("\n🗄️ SCHEMA ACTUAL:")
+# 9. Schema actual
+print("\nSCHEMA ACTUAL:")
 c.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='documentos'")
 r = c.fetchone()
-if r: print(f"   {r[0][:300]}...")
+if r:
+    print(f"   {r[0][:300]}...")
 
 conn.close()
 print("\n" + "=" * 70)
-print("  FIN DIAGNÓSTICO")
+print("  FIN DIAGNOSTICO")
 print("=" * 70)

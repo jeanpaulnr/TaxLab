@@ -1,0 +1,337 @@
+{
+  "resumen": {
+    "generated_at": "2026-03-12T19:45:21.591344",
+    "db_path": "C:\\Users\\jeanp\\Programas\\sii_normativa_v2.1\\data\\sii_normativa.db",
+    "desde": 2013,
+    "hasta": 2026,
+    "total_documentos": 2745,
+    "por_tipo": [
+      {
+        "tipo": "circular",
+        "total": 849
+      },
+      {
+        "tipo": "resolucion",
+        "total": 1896
+      }
+    ],
+    "documentos_contenido_vacio": 0,
+    "documentos_chars_cero": 0,
+    "documentos_sin_pdf": 0,
+    "documentos_paginas_cero": 0,
+    "documentos_sin_hash": 0,
+    "documentos_sin_pdf_size": 0,
+    "sospechosos_truncacion": 0,
+    "demasiado_cortos": 22
+  },
+  "por_anio": [
+    {
+      "tipo": "circular",
+      "anio": 2026,
+      "docs": 10,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 2706,
+      "avg_len": 9966.4,
+      "max_len": 40314
+    },
+    {
+      "tipo": "resolucion",
+      "anio": 2026,
+      "docs": 40,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 2578,
+      "avg_len": 11500.0,
+      "max_len": 51844
+    },
+    {
+      "tipo": "circular",
+      "anio": 2025,
+      "docs": 68,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 1510,
+      "avg_len": 22118.9,
+      "max_len": 123312
+    },
+    {
+      "tipo": "resolucion",
+      "anio": 2025,
+      "docs": 208,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 2161,
+      "avg_len": 12766.8,
+      "max_len": 102889
+    },
+    {
+      "tipo": "circular",
+      "anio": 2024,
+      "docs": 54,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 1475,
+      "avg_len": 15317.6,
+      "max_len": 110093
+    },
+    {
+      "tipo": "resolucion",
+      "anio": 2024,
+      "docs": 132,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 2240,
+      "avg_len": 10345.2,
+      "max_len": 48048
+    },
+    {
+      "tipo": "circular",
+      "anio": 2023,
+      "docs": 54,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 1721,
+      "avg_len": 10724.8,
+      "max_len": 49825
+    },
+    {
+      "tipo": "resolucion",
+      "anio": 2023,
+      "docs": 149,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 1948,
+      "avg_len": 10713.1,
+      "max_len": 105243
+    },
+    {
+      "tipo": "circular",
+      "anio": 2022,
+      "docs": 58,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 178,
+      "avg_len": 18548.3,
+      "max_len": 116521
+    },
+    {
+      "tipo": "resolucion",
+      "anio": 2022,
+      "docs": 127,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 2019,
+      "avg_len": 11106.0,
+      "max_len": 71648
+    },
+    {
+      "tipo": "circular",
+      "anio": 2021,
+      "docs": 67,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 59,
+      "avg_len": 26186.4,
+      "max_len": 235818
+    },
+    {
+      "tipo": "resolucion",
+      "anio": 2021,
+      "docs": 143,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 2040,
+      "avg_len": 11397.8,
+      "max_len": 43844
+    },
+    {
+      "tipo": "circular",
+      "anio": 2020,
+      "docs": 73,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 772,
+      "avg_len": 30622.2,
+      "max_len": 447142
+    },
+    {
+      "tipo": "resolucion",
+      "anio": 2020,
+      "docs": 175,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 1424,
+      "avg_len": 9606.4,
+      "max_len": 41824
+    },
+    {
+      "tipo": "circular",
+      "anio": 2019,
+      "docs": 49,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 1322,
+      "avg_len": 8372.7,
+      "max_len": 30419
+    },
+    {
+      "tipo": "resolucion",
+      "anio": 2019,
+      "docs": 145,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 1469,
+      "avg_len": 7966.6,
+      "max_len": 41291
+    },
+    {
+      "tipo": "circular",
+      "anio": 2018,
+      "docs": 60,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 63,
+      "avg_len": 10895.4,
+      "max_len": 81936
+    },
+    {
+      "tipo": "resolucion",
+      "anio": 2018,
+      "docs": 153,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 1934,
+      "avg_len": 7898.1,
+      "max_len": 36173
+    },
+    {
+      "tipo": "circular",
+      "anio": 2017,
+      "docs": 63,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 58,
+      "avg_len": 8001.9,
+      "max_len": 72407
+    },
+    {
+      "tipo": "resolucion",
+      "anio": 2017,
+      "docs": 128,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 2110,
+      "avg_len": 11230.7,
+      "max_len": 299945
+    },
+    {
+      "tipo": "circular",
+      "anio": 2016,
+      "docs": 70,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 1483,
+      "avg_len": 46351.4,
+      "max_len": 749881
+    },
+    {
+      "tipo": "resolucion",
+      "anio": 2016,
+      "docs": 130,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 1275,
+      "avg_len": 9411.3,
+      "max_len": 44405
+    },
+    {
+      "tipo": "circular",
+      "anio": 2015,
+      "docs": 92,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 60,
+      "avg_len": 43035.4,
+      "max_len": 335053
+    },
+    {
+      "tipo": "resolucion",
+      "anio": 2015,
+      "docs": 126,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 1506,
+      "avg_len": 6364.9,
+      "max_len": 22302
+    },
+    {
+      "tipo": "circular",
+      "anio": 2014,
+      "docs": 70,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 59,
+      "avg_len": 21413.1,
+      "max_len": 156110
+    },
+    {
+      "tipo": "resolucion",
+      "anio": 2014,
+      "docs": 129,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 1790,
+      "avg_len": 9440.0,
+      "max_len": 43906
+    },
+    {
+      "tipo": "circular",
+      "anio": 2013,
+      "docs": 61,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 54,
+      "avg_len": 14260.4,
+      "max_len": 125725
+    },
+    {
+      "tipo": "resolucion",
+      "anio": 2013,
+      "docs": 111,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 1778,
+      "avg_len": 8550.3,
+      "max_len": 48009
+    }
+  ]
+}

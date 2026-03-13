@@ -1,0 +1,36 @@
+{
+  "resumen": {
+    "generated_at": "2026-03-12T18:53:10.058342",
+    "db_path": "C:\\Users\\jeanp\\Programas\\sii_normativa_v2.1\\data\\sii_normativa.db",
+    "desde": 2012,
+    "hasta": 2012,
+    "total_documentos": 57,
+    "por_tipo": [
+      {
+        "tipo": "circular",
+        "total": 57
+      }
+    ],
+    "documentos_contenido_vacio": 0,
+    "documentos_chars_cero": 0,
+    "documentos_sin_pdf": 0,
+    "documentos_paginas_cero": 0,
+    "documentos_sin_hash": 0,
+    "documentos_sin_pdf_size": 0,
+    "sospechosos_truncacion": 0,
+    "demasiado_cortos": 9
+  },
+  "por_anio": [
+    {
+      "tipo": "circular",
+      "anio": 2012,
+      "docs": 57,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 250,
+      "avg_len": 22891.6,
+      "max_len": 895422
+    }
+  ]
+}

@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}TaxLab | Admin{% endblock %}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@600;700&family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#07090d;
+  --panel:#11151b;
+  --panel-2:rgba(255,255,255,.04);
+  --panel-3:rgba(255,255,255,.06);
+  --line:rgba(255,255,255,.09);
+  --line-soft:rgba(255,255,255,.06);
+  --line-strong:rgba(255,255,255,.15);
+  --text:#f4f7fb;
+  --text-soft:#b8c2ce;
+  --muted:#7d8996;
+  --accent:#edf3f8;
+  --cyan:#7cc7ff;
+  --emerald:#72dfb9;
+  --amber:#f0c96f;
+  --green:#72dfb9;
+  --red:#f18f86;
+  --shadow:0 24px 64px rgba(0,0,0,.36);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  min-height:100vh;
+  background:
+    radial-gradient(circle at top left, rgba(124,199,255,.12), transparent 24%),
+    radial-gradient(circle at top right, rgba(114,223,185,.12), transparent 20%),
+    linear-gradient(180deg, #07090d 0%, #0a0f16 100%);
+  color:var(--text);
+  font-family:'Manrope',sans-serif;
+}
+a{color:inherit}
+button,input,select,textarea{font:inherit}
+.admin-shell{min-height:100vh;display:grid;grid-template-columns:290px minmax(0,1fr)}
+.sidebar{
+  position:sticky;top:0;height:100vh;overflow:auto;
+  padding:24px 18px;border-right:1px solid var(--line);
+  background:linear-gradient(180deg, rgba(13,18,24,.96), rgba(8,12,17,.98));
+  backdrop-filter:blur(18px);
+}
+.brand{display:flex;align-items:center;gap:14px;padding:8px}
+.brand-mark{
+  width:50px;height:50px;display:grid;place-items:center;
+  border-radius:18px;border:1px solid var(--line);
+  background:rgba(255,255,255,.05);font-weight:800;
+}
+.brand-copy{display:grid;gap:2px}
+.brand-kicker{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted)}
+.brand-title{font-size:17px;font-weight:700}
+.sidebar-pill{
+  margin:16px 8px 0;display:inline-flex;align-items:center;gap:8px;padding:7px 12px;
+  border-radius:999px;border:1px solid rgba(124,199,255,.18);background:rgba(124,199,255,.08);
+  font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#d6ecff;
+}
+.nav-stack{margin-top:24px;display:grid;gap:6px}
+.nav-link{
+  display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:18px;border:1px solid transparent;
+  text-decoration:none;color:var(--text-soft);transition:.18s ease;
+}
+.nav-link:hover{background:rgba(255,255,255,.04);border-color:var(--line);color:var(--text)}
+.nav-link.is-active{background:var(--accent);border-color:var(--accent);color:#0f1720}
+.nav-icon{width:10px;height:10px;border-radius:999px;background:currentColor}
+.nav-copy{display:grid;gap:2px}
+.nav-title{font-size:14px;font-weight:700}
+.nav-sub{font-size:11px;opacity:.75}
+.sidebar-card,.sidebar-foot{
+  margin-top:26px;padding:18px;border:1px solid var(--line);border-radius:24px;
+  background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.025));
+}
+.sidebar-card strong{display:block;margin-bottom:8px}
+.sidebar-card p,.sidebar-foot dd{font-size:13px;line-height:1.75;color:var(--text-soft)}
+.sidebar-foot dl{display:grid;gap:12px}
+.sidebar-foot dt{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
+.main-shell{min-width:0;display:flex;flex-direction:column}
+.topbar{
+  position:sticky;top:0;z-index:20;display:flex;align-items:flex-start;justify-content:space-between;gap:24px;
+  padding:24px 28px 18px;border-bottom:1px solid var(--line);background:rgba(7,9,13,.78);backdrop-filter:blur(18px);
+}
+.topbar-title{font-family:'Crimson Pro',serif;font-size:36px;font-weight:700;line-height:1.04;letter-spacing:-.03em}
+.topbar-subtitle{margin-top:10px;max-width:780px;color:var(--text-soft);font-size:14px;line-height:1.8}
+.topbar-right{display:flex;flex-direction:column;gap:12px;align-items:flex-end;min-width:320px}
+.top-search{
+  width:min(100%,420px);display:flex;align-items:center;gap:10px;padding:0 14px;
+  border:1px solid var(--line);border-radius:18px;background:rgba(255,255,255,.04);
+}
+.top-search input{width:100%;border:none;background:transparent;color:var(--text);padding:12px 0;outline:none}
+.top-search input::placeholder{color:var(--muted)}
+.topbar-actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end}
+.page-shell{padding:24px 28px 40px}
+.card{
+  background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.025));
+  border:1px solid var(--line);border-radius:28px;box-shadow:var(--shadow);
+}
+.card + .card{margin-top:18px}
+.card-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 20px;border-bottom:1px solid var(--line-soft)}
+.card-title{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
+.card-body{padding:20px}
+.card-body.tight{padding:16px}
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:11px 16px;border-radius:18px;border:1px solid transparent;
+  text-decoration:none;cursor:pointer;transition:.18s ease;font-size:13px;font-weight:700;background:transparent;
+}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:#0f1720}
+.btn-primary:hover{background:#dce6f0}
+.btn-secondary{background:rgba(255,255,255,.04);border-color:var(--line);color:var(--text)}
+.btn-secondary:hover{background:rgba(255,255,255,.08);border-color:var(--line-strong)}
+.btn-danger{background:rgba(241,143,134,.12);border-color:rgba(241,143,134,.24);color:#ffc0bb}
+.btn-ghost{background:transparent;border-color:var(--line);color:var(--muted)}
+.badge{
+  display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;border:1px solid var(--line);
+  background:rgba(255,255,255,.04);color:var(--text-soft);font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+}
+.badge.success{background:rgba(114,223,185,.12);border-color:rgba(114,223,185,.2);color:#c7f5e4}
+.badge.warning{background:rgba(240,201,111,.12);border-color:rgba(240,201,111,.2);color:#f4dfaa}
+.badge.danger{background:rgba(241,143,134,.12);border-color:rgba(241,143,134,.22);color:#ffc0bb}
+.badge.info{background:rgba(124,199,255,.12);border-color:rgba(124,199,255,.2);color:#d6ecff}
+.field-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.field{display:flex;flex-direction:column;gap:8px}
+.label{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.input,.select,.textarea{
+  width:100%;border:1px solid var(--line);border-radius:18px;background:rgba(255,255,255,.035);color:var(--text);padding:12px 14px;outline:none;
+}
+.textarea{min-height:130px;resize:vertical;line-height:1.7}
+.input:focus,.select:focus,.textarea:focus{border-color:rgba(124,199,255,.3);box-shadow:0 0 0 4px rgba(124,199,255,.08)}
+.flash-inline{
+  padding:14px 15px;border:1px solid var(--line);border-radius:18px;background:rgba(255,255,255,.04);color:var(--text-soft);font-size:13px;line-height:1.75;
+}
+.muted{color:var(--muted)}
+.list-clean{list-style:none}
+.inline-actions{display:flex;flex-wrap:wrap;gap:10px}
+.empty-state{padding:44px 22px;text-align:center;color:var(--muted)}
+.empty-title{margin-top:12px;font-family:'Crimson Pro',serif;font-size:28px;color:var(--text)}
+.empty-copy{max-width:620px;margin:10px auto 0;font-size:14px;line-height:1.8}
+.kpi-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.kpi{padding:20px;border:1px solid var(--line);border-radius:24px;background:rgba(255,255,255,.04)}
+.kpi-value{font-family:'Crimson Pro',serif;font-size:34px;line-height:1}
+.kpi-label{margin-top:8px;font-size:13px;color:var(--text-soft)}
+.kpi-note{margin-top:10px;font-size:11px;color:var(--muted)}
+@media (max-width:1180px){.kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:1024px){
+  .admin-shell{grid-template-columns:1fr}
+  .sidebar{position:relative;height:auto}
+  .topbar{position:relative;flex-direction:column}
+  .topbar-right{min-width:0;width:100%;align-items:stretch}
+  .topbar-actions{justify-content:flex-start}
+}
+@media (max-width:720px){
+  .page-shell,.topbar{padding-left:18px;padding-right:18px}
+  .field-grid,.kpi-grid{grid-template-columns:1fr}
+}
+</style>
+{% block page_styles %}{% endblock %}
+</head>
+<body>
+<div class="admin-shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">AD</div>
+      <div class="brand-copy">
+        <div class="brand-kicker">TaxLab</div>
+        <div class="brand-title">Consola privada</div>
+      </div>
+    </div>
+
+    <div class="sidebar-pill">Solo administraci&oacute;n</div>
+
+    <nav class="nav-stack">
+      <a href="/admin" class="nav-link {{ 'is-active' if active_section == 'admin_dashboard' else '' }}">
+        <span class="nav-icon"></span>
+        <span class="nav-copy"><span class="nav-title">Dashboard</span><span class="nav-sub">Visi&oacute;n ejecutiva</span></span>
+      </a>
+      <a href="/admin#scraping" class="nav-link {{ 'is-active' if active_section == 'admin_dashboard' else '' }}">
+        <span class="nav-icon"></span>
+        <span class="nav-copy"><span class="nav-title">Scraping</span><span class="nav-sub">Jobs y pipelines</span></span>
+      </a>
+      <a href="/admin#traffic" class="nav-link {{ 'is-active' if active_section == 'admin_dashboard' else '' }}">
+        <span class="nav-icon"></span>
+        <span class="nav-copy"><span class="nav-title">Tr&aacute;fico</span><span class="nav-sub">Actividad y flujo</span></span>
+      </a>
+      <a href="/admin#users" class="nav-link {{ 'is-active' if active_section == 'admin_dashboard' else '' }}">
+        <span class="nav-icon"></span>
+        <span class="nav-copy"><span class="nav-title">Usuarios</span><span class="nav-sub">Casos y espacios</span></span>
+      </a>
+      <a href="/admin#tokens" class="nav-link {{ 'is-active' if active_section == 'admin_dashboard' else '' }}">
+        <span class="nav-icon"></span>
+        <span class="nav-copy"><span class="nav-title">Tokens</span><span class="nav-sub">IA y costos</span></span>
+      </a>
+      <a href="/admin#system" class="nav-link {{ 'is-active' if active_section == 'admin_dashboard' else '' }}">
+        <span class="nav-icon"></span>
+        <span class="nav-copy"><span class="nav-title">Sistema</span><span class="nav-sub">Salud e infraestructura</span></span>
+      </a>
+      <a href="/admin/scraper" class="nav-link {{ 'is-active' if active_section == 'admin_scraper' else '' }}">
+        <span class="nav-icon"></span>
+        <span class="nav-copy"><span class="nav-title">Panel de scraping</span><span class="nav-sub">Control operativo</span></span>
+      </a>
+      <a href="/admin/ingestion" class="nav-link {{ 'is-active' if active_section == 'admin_ingestion' else '' }}">
+        <span class="nav-icon"></span>
+        <span class="nav-copy"><span class="nav-title">Ingesta y QA</span><span class="nav-sub">Chequeos del corpus</span></span>
+      </a>
+      <a href="/agregar" class="nav-link {{ 'is-active' if active_section == 'agregar' else '' }}">
+        <span class="nav-icon"></span>
+        <span class="nav-copy"><span class="nav-title">Agregar manual</span><span class="nav-sub">Carga editorial</span></span>
+      </a>
+      <a href="/app" class="nav-link">
+        <span class="nav-icon"></span>
+        <span class="nav-copy"><span class="nav-title">Volver a la app</span><span class="nav-sub">Experiencia de usuario</span></span>
+      </a>
+    </nav>
+
+    <div class="sidebar-card">
+      <strong>Centro de control interno</strong>
+      <p>Este espacio es privado para scraping, integridad documental, monitoreo del corpus, futuros costos de IA y operaci&oacute;n interna del producto.</p>
+    </div>
+
+    <div class="sidebar-foot">
+      <dl>
+        <div>
+          <dt>Corpus</dt>
+          <dd>{% if shell_total_docs is defined %}{{ '{:,}'.format(shell_total_docs).replace(',', '.') }} documentos activos{% else %}Sin datos{% endif %}</dd>
+        </div>
+        <div>
+          <dt>Prioridad</dt>
+          <dd>Integridad, trazabilidad y operaci&oacute;n interna antes de capas IA m&aacute;s complejas.</dd>
+        </div>
+      </dl>
+    </div>
+  </aside>
+
+  <div class="main-shell">
+    <header class="topbar">
+      <div>
+        <div class="topbar-title">{{ page_title or 'Consola privada' }}</div>
+        <div class="topbar-subtitle">{{ page_subtitle or 'Centro de control para scraping, salud operativa, integridad del corpus y administraci&oacute;n interna.' }}</div>
+      </div>
+      <div class="topbar-right">
+        <form class="top-search" action="/admin" method="get">
+          <span class="muted">Buscar</span>
+          <input type="text" name="q" placeholder="Jobs, estados, fuentes o m&eacute;tricas">
+        </form>
+        <div class="topbar-actions">{% block top_actions %}{% endblock %}</div>
+      </div>
+    </header>
+
+    <main class="page-shell {% block page_shell_class %}{% endblock %}">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+{% block page_scripts %}{% endblock %}
+</body>
+</html>

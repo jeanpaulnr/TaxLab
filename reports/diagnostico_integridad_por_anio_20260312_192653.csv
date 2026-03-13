@@ -1,0 +1,7 @@
+tipo,anio,docs,sospechosos_truncados,sin_chars,sin_paginas,min_len,avg_len,max_len
+circular,2026,10,0,0,0,2706,9966.4,40314
+circular,2017,3,0,0,0,5476,7524.0,8827
+circular,2016,70,0,0,0,1483,46351.4,749881
+circular,2015,92,0,0,0,60,43035.4,335053
+circular,2014,70,0,0,0,59,21413.1,156110
+circular,2013,61,0,0,0,54,14260.4,125725

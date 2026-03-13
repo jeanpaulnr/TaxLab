@@ -1,0 +1,142 @@
+{% extends 'base_admin.html' %}
+
+{% block title %}Admin | TaxLab{% endblock %}
+
+{% block top_actions %}
+<a class="btn btn-secondary" href="/admin/ingestion">Ver ingesta</a>
+<a class="btn btn-primary" href="/admin/scraper">Controlar scraping</a>
+{% endblock %}
+
+{% block page_styles %}
+<style>
+.admin-grid{display:grid;grid-template-columns:1.2fr .8fr;gap:18px;align-items:start}
+.panel-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.panel-kpi{padding:20px;border:1px solid var(--line);border-radius:24px;background:rgba(255,255,255,.04)}
+.panel-kpi strong{display:block;font-family:'Fraunces',serif;font-size:34px;line-height:1}
+.panel-kpi span{display:block;margin-top:8px;font-size:13px;color:var(--text-soft)}
+.ops-grid{display:grid;gap:12px}
+.ops-item{padding:16px;border:1px solid var(--line);border-radius:20px;background:rgba(255,255,255,.04)}
+.ops-item h3{font-size:15px}
+.ops-item p{margin-top:8px;color:var(--text-soft);font-size:13px;line-height:1.8}
+.mini-table{width:100%;border-collapse:collapse}
+.mini-table th,.mini-table td{padding:12px 0;border-bottom:1px solid rgba(255,255,255,.06);text-align:left;font-size:13px}
+.mini-table th{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.mini-table td{color:var(--text-soft)}
+.bar-stack{display:grid;gap:12px}
+.bar-row{padding:14px;border:1px solid var(--line);border-radius:18px;background:rgba(255,255,255,.04)}
+.bar-label{display:flex;justify-content:space-between;gap:12px;margin-bottom:10px;font-size:13px;color:var(--text-soft)}
+.bar-track{height:8px;border-radius:999px;background:rgba(255,255,255,.06);overflow:hidden}
+.bar-fill{height:100%;border-radius:999px;background:linear-gradient(90deg, var(--cyan), var(--emerald))}
+@media (max-width:1100px){
+  .admin-grid,.panel-grid{grid-template-columns:1fr}
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="panel-grid" style="margin-bottom:18px;">
+  <div class="panel-kpi">
+    <strong>{{ '{:,}'.format(total).replace(',', '.') }}</strong>
+    <span>Documentos activos en el corpus</span>
+  </div>
+  <div class="panel-kpi">
+    <strong>{{ por_tipo.get('judicial', 0) }}</strong>
+    <span>Judicial cargado</span>
+  </div>
+  <div class="panel-kpi">
+    <strong>{{ logs|length }}</strong>
+    <span>Eventos recientes de scraper</span>
+  </div>
+  <div class="panel-kpi">
+    <strong>{{ 'Activo' if status.running else 'En espera' }}</strong>
+    <span>Estado del motor de scraping</span>
+  </div>
+</div>
+
+<div class="admin-grid">
+  <div style="display:grid;gap:18px;">
+    <section class="card">
+      <div class="card-head"><div class="card-title">Visión general de plataforma</div></div>
+      <div class="card-body">
+        <div class="flash-inline" style="margin-bottom:14px;">Esta consola se apoya en el corpus real, no en métricas simuladas. Desde aquí conviven scraping, QA, ingesta y salud documental.</div>
+        <table class="mini-table">
+          <thead>
+            <tr><th>Tipo</th><th>Total</th></tr>
+          </thead>
+          <tbody>
+            {% for tipo, total_tipo in por_tipo.items() %}
+            <tr>
+              <td>{{ tipo|capitalize }}</td>
+              <td>{{ '{:,}'.format(total_tipo).replace(',', '.') }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><div class="card-title">Operación inmediata</div></div>
+      <div class="card-body">
+        <div class="ops-grid">
+          <div class="ops-item">
+            <h3>Scraping controlado</h3>
+            <p>El panel operativo ya est&aacute; listo para lanzar a&ntilde;os, hist&oacute;ricos, detener procesos y seguir logs en tiempo real sin salir de la consola.</p>
+          </div>
+          <div class="ops-item">
+            <h3>Ingesta y QA</h3>
+            <p>La segunda capa admin queda preparada para revisar salud del corpus, fuentes y futuros chequeos de completitud.</p>
+          </div>
+          <div class="ops-item">
+            <h3>Carga editorial</h3>
+            <p>La carga manual sigue disponible para documentos de apoyo o correcciones puntuales del corpus sin romper el modelo canónico.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div style="display:grid;gap:18px;">
+    <section class="card">
+      <div class="card-head"><div class="card-title">Salud operativa</div></div>
+      <div class="card-body tight">
+        <div class="bar-stack">
+          <div class="bar-row">
+            <div class="bar-label"><span>Cobertura documental</span><span>{% if total %}100%{% else %}0%{% endif %}</span></div>
+            <div class="bar-track"><div class="bar-fill" style="width:{% if total %}100{% else %}0{% endif %}%;"></div></div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label"><span>Última carga</span><span>{{ (ultima_actualizacion or 'sin registro')[:10] if ultima_actualizacion else 'sin registro' }}</span></div>
+            <div class="bar-track"><div class="bar-fill" style="width:78%;"></div></div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label"><span>Casos privados</span><span>{{ total_casos }}</span></div>
+            <div class="bar-track"><div class="bar-fill" style="width:52%;"></div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><div class="card-title">Últimos eventos</div></div>
+      <div class="card-body tight">
+        {% if logs %}
+        <div class="ops-grid">
+          {% for item in logs[:6] %}
+          <div class="ops-item">
+            <h3>{{ item.tipo or 'scraper' }} · {{ item.anio or '-' }}</h3>
+            <p>{{ item.estado or 'sin estado' }}{% if item.numero %} · Nº {{ item.numero }}{% endif %}</p>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+          <div class="empty-title">Sin eventos aún</div>
+          <div class="empty-copy">Cuando el scraper vuelva a correr, el feed operativo aparecerá aquí.</div>
+        </div>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock %}

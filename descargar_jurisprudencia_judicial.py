@@ -32,13 +32,12 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(BASE, "scraper"))
 
 from engine import (  # noqa: E402
+    _indexar_articulos_conservador,
     PDF_DIR,
     SESSION,
     detectar_articulos,
     detectar_leyes,
-    doc_existe_hash,
     get_db,
-    guardar_documento,
     log,
     log_scraper,
 )
@@ -567,7 +566,8 @@ def actualizar_documento_base(doc_id, doc_data, contenido_struct, paginas):
             UPDATE documentos
             SET numero=?, anio=?, fecha=?, titulo=?, materia=?, subtema=?,
                 contenido=?, resumen=?, url_sii=?, referencia=?, palabras_clave=?,
-                leyes_citadas=?, articulos_clave=?, paginas=?, chars_texto=?, fuente=?
+                leyes_citadas=?, articulos_clave=?, paginas=?, chars_texto=?,
+                pdf_local=?, pdf_size_bytes=?, fuente=?
             WHERE id=?
             """,
             (
@@ -586,11 +586,121 @@ def actualizar_documento_base(doc_id, doc_data, contenido_struct, paginas):
                 doc_data["articulos_clave"],
                 paginas,
                 len(contenido_struct),
+                doc_data["pdf_local"],
+                doc_data["pdf_size_bytes"],
                 doc_data["fuente"],
                 doc_id,
             ),
         )
         conn.commit()
+    finally:
+        conn.close()
+
+
+def upsert_documento_judicial(doc_data, sii_id):
+    conn = get_db()
+    try:
+        existing = conn.execute(
+            """
+            SELECT d.id
+            FROM judicial_docs j
+            JOIN documentos d ON d.id = j.doc_id
+            WHERE j.sii_id=?
+            """,
+            (int(sii_id),),
+        ).fetchone()
+        if not existing:
+            existing = conn.execute(
+                "SELECT id FROM documentos WHERE hash_md5=?",
+                (doc_data["hash_md5"],),
+            ).fetchone()
+
+        if existing:
+            doc_id = existing["id"]
+            conn.execute(
+                """
+                UPDATE documentos
+                SET hash_md5=?, tipo=?, numero=?, anio=?, fecha=?, titulo=?, materia=?, subtema=?,
+                    contenido=?, resumen=?, url_sii=?, referencia=?, palabras_clave=?,
+                    leyes_citadas=?, articulos_clave=?, paginas=?, chars_texto=?,
+                    pdf_local=?, pdf_size_bytes=?, fuente=?, fecha_carga=datetime('now')
+                WHERE id=?
+                """,
+                (
+                    doc_data["hash_md5"],
+                    doc_data["tipo"],
+                    doc_data["numero"],
+                    doc_data["anio"],
+                    doc_data["fecha"],
+                    doc_data["titulo"],
+                    doc_data["materia"],
+                    doc_data["subtema"],
+                    doc_data["contenido"],
+                    doc_data["resumen"],
+                    doc_data["url_sii"],
+                    doc_data["referencia"],
+                    doc_data["palabras_clave"],
+                    doc_data["leyes_citadas"],
+                    doc_data["articulos_clave"],
+                    doc_data["paginas"],
+                    doc_data["chars_texto"],
+                    doc_data["pdf_local"],
+                    doc_data["pdf_size_bytes"],
+                    doc_data["fuente"],
+                    doc_id,
+                ),
+            )
+            ya_existia = True
+        else:
+            conn.execute(
+                """
+                INSERT INTO documentos(
+                    hash_md5, tipo, numero, anio, fecha, titulo, materia, subtema,
+                    contenido, resumen, url_sii, referencia, palabras_clave,
+                    leyes_citadas, articulos_clave, paginas, chars_texto,
+                    pdf_local, pdf_size_bytes, fuente
+                )
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                """,
+                (
+                    doc_data["hash_md5"],
+                    doc_data["tipo"],
+                    doc_data["numero"],
+                    doc_data["anio"],
+                    doc_data["fecha"],
+                    doc_data["titulo"],
+                    doc_data["materia"],
+                    doc_data["subtema"],
+                    doc_data["contenido"],
+                    doc_data["resumen"],
+                    doc_data["url_sii"],
+                    doc_data["referencia"],
+                    doc_data["palabras_clave"],
+                    doc_data["leyes_citadas"],
+                    doc_data["articulos_clave"],
+                    doc_data["paginas"],
+                    doc_data["chars_texto"],
+                    doc_data["pdf_local"],
+                    doc_data["pdf_size_bytes"],
+                    doc_data["fuente"],
+                ),
+            )
+            row = conn.execute(
+                "SELECT id FROM documentos WHERE hash_md5=?",
+                (doc_data["hash_md5"],),
+            ).fetchone()
+            doc_id = row["id"] if row else None
+            ya_existia = False
+
+        if not doc_id:
+            conn.rollback()
+            return None, False
+
+        leyes = json.loads(doc_data["leyes_citadas"] or "[]")
+        articulos = json.loads(doc_data["articulos_clave"] or "[]")
+        _indexar_articulos_conservador(conn, doc_id, leyes, articulos)
+        conn.commit()
+        return doc_id, ya_existia
     finally:
         conn.close()
 
@@ -602,8 +712,8 @@ def guardar_metadata_judicial(doc_id, detalle, relaciones, pdf_path, html_path):
             """
             INSERT INTO judicial_docs(doc_id, sii_id, tipo_codigo, corte, tribunal, pdf_local, html_local)
             VALUES(?,?,?,?,?,?,?)
-            ON CONFLICT(doc_id) DO UPDATE SET
-                sii_id=excluded.sii_id,
+            ON CONFLICT(sii_id) DO UPDATE SET
+                doc_id=excluded.doc_id,
                 tipo_codigo=excluded.tipo_codigo,
                 corte=excluded.corte,
                 tribunal=excluded.tribunal,
@@ -678,9 +788,10 @@ def guardar_pronunciamiento(detalle):
 
     html_path = guardar_html_fuente(detalle, html_sentencia, anio)
     pdf_path, paginas = crear_pdf_judicial(detalle, contenido_struct, anio)
+    pdf_local = relative_asset_path(pdf_path)
+    pdf_size_bytes = os.path.getsize(pdf_path) if pdf_path and os.path.exists(pdf_path) else 0
 
     hash_md5 = hashlib.md5(f"judicial:{pron_id}".encode("utf-8")).hexdigest()
-    ya_existia = doc_existe_hash(hash_md5)
 
     tipo_pron = normalize((detalle.get("tipoPronunciamiento") or {}).get("nombre"))
     instancia = normalize((detalle.get("instancia") or {}).get("nombre"))
@@ -702,10 +813,14 @@ def guardar_pronunciamiento(detalle):
         "palabras_clave": construir_palabras_clave(detalle, relaciones, texto_resumen, texto_extracto),
         "leyes_citadas": json.dumps(relaciones["leyes_siglas"], ensure_ascii=False),
         "articulos_clave": json.dumps(relaciones["articulos"], ensure_ascii=False),
+        "paginas": paginas,
+        "chars_texto": len(contenido_struct),
+        "pdf_local": pdf_local,
+        "pdf_size_bytes": pdf_size_bytes,
         "fuente": "sii_judicial",
     }
 
-    doc_id = guardar_documento(doc_data)
+    doc_id, ya_existia = upsert_documento_judicial(doc_data, pron_id)
     if not doc_id:
         raise RuntimeError(f"No pude guardar el pronunciamiento {pron_id} en la base")
 

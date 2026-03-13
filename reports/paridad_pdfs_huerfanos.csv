@@ -1,0 +1,10 @@
+﻿id_db,clave_logica,tipo,numero,anio,fecha,titulo,url_fuente,fuente_db,pdf_encontrado,ruta_pdf,pdf_valido,pdf_motivo,html_encontrado,ruta_html,imagen_encontrada,ruta_imagen,ocr_encontrado,ruta_ocr,doc_encontrado,ruta_doc,estado_paridad,matching_usado,observaciones
+,,,,,,,,,1,pdfs\resolucion\2020\resolucion_2020_0017.pdf,1,ok,0,,0,,0,,0,,PDF_HUERFANO,ninguno,
+,,,,,,,,,1,pdfs\resolucion\2021\resolucion_2021_0092.pdf,1,ok,0,,0,,0,,0,,PDF_HUERFANO,ninguno,
+,,,,,,,,,1,pdfs\resolucion\2022\resolucion_2022_0002.pdf,1,ok,0,,0,,0,,0,,PDF_HUERFANO,ninguno,
+,,,,,,,,,1,pdfs\resolucion\2022\resolucion_2022_0107.pdf,1,ok,0,,0,,0,,0,,PDF_HUERFANO,ninguno,
+,,,,,,,,,1,pdfs\resolucion\2023\resolucion_2023_0082.pdf,1,ok,0,,0,,0,,0,,PDF_HUERFANO,ninguno,
+,,,,,,,,,1,pdfs\resolucion\2025\resolucion_2025_0189.pdf,1,ok,0,,0,,0,,0,,PDF_HUERFANO,ninguno,
+,,,,,,,,,1,pdfs\oficio\otras_normas\2020\oficio_2020_2055_f39eb8d3.pdf,1,ok,0,,0,,0,,0,,PDF_HUERFANO,ninguno,
+,,,,,,,,,1,pdfs\oficio\otras_normas\2025\oficio_2025_1042_d8eab468.pdf,1,ok,0,,0,,0,,0,,PDF_HUERFANO,ninguno,
+,,,,,,,,,1,pdfs\oficio\lir\2019\oficio_2019_2184_364e4d53.pdf,1,ok,0,,0,,0,,0,,PDF_HUERFANO,ninguno,

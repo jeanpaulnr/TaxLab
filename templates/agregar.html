@@ -1,4 +1,4 @@
-﻿{% extends 'base.html' %}
+{% extends 'base_admin.html' %}
 
 {% block title %}Agregar documento | TaxLab IA{% endblock %}
 
@@ -26,7 +26,7 @@
               </select>
             </div>
             <div class="field"><label class="label">Numero</label><input id="numero" class="input" placeholder="31"></div>
-            <div class="field"><label class="label">Anio</label><input id="anio" class="input" type="number" min="1980" max="{{ anio_actual }}" placeholder="{{ anio_actual }}"></div>
+            <div class="field"><label class="label">A&ntilde;o</label><input id="anio" class="input" type="number" min="1980" max="{{ anio_actual }}" placeholder="{{ anio_actual }}"></div>
             <div class="field"><label class="label">Fecha</label><input id="fecha" class="input" type="date"></div>
           </div>
           <div class="field" style="margin-top:14px;"><label class="label">Titulo</label><input id="titulo" class="input" placeholder="Imparte instrucciones sobre..."></div>
@@ -96,7 +96,7 @@ async function guardar(){
     articulos_clave: null
   };
   if(!payload.titulo || !payload.anio){
-    alert('Titulo y anio son obligatorios.');
+    alert('Título y año son obligatorios.');
     return;
   }
   const response = await fetch('/agregar', {

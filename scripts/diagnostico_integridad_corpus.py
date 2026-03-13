@@ -84,6 +84,16 @@ def main():
             WHERE anio BETWEEN ? AND ?
               AND COALESCE(paginas, 0) = 0
         ''', params)
+        sin_hash = fetch_scalar(conn, '''
+            SELECT COUNT(*) FROM documentos
+            WHERE anio BETWEEN ? AND ?
+              AND (hash_md5 IS NULL OR trim(hash_md5) = '')
+        ''', params)
+        sin_pdf_size = fetch_scalar(conn, '''
+            SELECT COUNT(*) FROM documentos
+            WHERE anio BETWEEN ? AND ?
+              AND COALESCE(pdf_size_bytes, 0) = 0
+        ''', params)
         sospechosos_truncados = rows_to_dicts(conn.execute(
             '''SELECT id, tipo, numero, anio, fecha, titulo,
                       length(contenido) AS len_contenido,
@@ -172,6 +182,8 @@ def main():
             'documentos_chars_cero': chars_cero,
             'documentos_sin_pdf': len(pdf_faltantes_detalle),
             'documentos_paginas_cero': paginas_cero,
+            'documentos_sin_hash': sin_hash,
+            'documentos_sin_pdf_size': sin_pdf_size,
             'sospechosos_truncacion': len(sospechosos_truncados),
             'demasiado_cortos': len(demasiado_cortos),
         }
@@ -219,6 +231,8 @@ def main():
         print(f'Contenido vacio:          {vacios}')
         print(f'chars_texto = 0/NULL:     {chars_cero}')
         print(f'paginas = 0/NULL:         {paginas_cero}')
+        print(f'hash_md5 vacio:           {sin_hash}')
+        print(f'pdf_size_bytes = 0/NULL:  {sin_pdf_size}')
         print(f'Sin PDF asociado:         {len(pdf_faltantes_detalle)}')
         print(f'Sospechosos truncacion:   {len(sospechosos_truncados)}')
         print(f'Demasiado cortos (<1500): {len(demasiado_cortos)}')

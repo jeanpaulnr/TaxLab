@@ -1,4 +1,4 @@
-﻿{% extends 'base.html' %}
+{% extends 'base_admin.html' %}
 
 {% block title %}Scraper | TaxLab IA{% endblock %}
 
@@ -41,12 +41,12 @@
 </div>
 
 <div class="warn-box" style="margin-bottom:18px;">
-  El scraper real se mantiene intacto. Este panel solo reorganiza la operacion: prueba por anio primero, luego corre historicos largos en segundo plano y usa el polling para monitorear progreso.
+  El scraper real se mantiene intacto. Este panel solo reorganiza la operación: prueba por año primero, luego corre históricos largos en segundo plano y usa el polling para monitorear progreso.
 </div>
 
 <div class="scraper-grid">
   <section class="card">
-    <div class="card-head"><div class="card-title">Descarga por anio / tipo</div></div>
+    <div class="card-head"><div class="card-title">Descarga por año / tipo</div></div>
     <div class="card-body">
       <div class="scraper-grid" style="grid-template-columns:1fr 1fr;gap:14px;">
         <div class="field">
@@ -60,7 +60,7 @@
           </select>
         </div>
         <div class="field">
-          <label class="label">Anio</label>
+          <label class="label">A&ntilde;o</label>
           <select id="sc-anio" class="select">
             {% for a in range(anio_actual, 1989, -1) %}
             <option value="{{ a }}">{{ a }}</option>
@@ -73,7 +73,7 @@
         <input id="sc-delay" class="input" type="number" min="0.5" max="5" step="0.5" value="1.0">
       </div>
       <div class="inline-actions" style="margin-top:16px;">
-        <button class="btn btn-primary" id="btn-anio" onclick="iniciarAnio()">Descargar anio</button>
+         <button class="btn btn-primary" id="btn-anio" onclick="iniciarAnio()">Descargar a&ntilde;o</button>
       </div>
     </div>
   </section>
@@ -81,7 +81,7 @@
   <section class="card">
     <div class="card-head"><div class="card-title">Verificacion de novedades</div></div>
     <div class="card-body">
-      <div class="flash-inline">Consulta si hay documentos nuevos del anio actual en los tipos soportados. El scheduler diario sigue ejecutandose aparte.</div>
+      <div class="flash-inline">Consulta si hay documentos nuevos del a&ntilde;o actual en los tipos soportados. El scheduler diario sigue ejecut&aacute;ndose aparte.</div>
       <div style="margin-top:14px;color:var(--muted);font-size:13px;line-height:1.7;">Ultima ejecucion scheduler: <strong style="color:var(--text);">{{ ultima_ejecucion }}</strong></div>
       <div class="inline-actions" style="margin-top:16px;">
         <button class="btn btn-secondary" id="btn-nov" onclick="checkNovedades()">Verificar ahora</button>
@@ -95,7 +95,7 @@
   <div class="card-body">
     <div class="scraper-grid-3">
       <div class="field">
-        <label class="label">Anio desde</label>
+        <label class="label">A&ntilde;o desde</label>
         <select id="h-desde" class="select">
           {% for a in range(anio_actual, 1989, -1) %}
           <option value="{{ a }}" {% if a == 2015 %}selected{% endif %}>{{ a }}</option>
@@ -103,7 +103,7 @@
         </select>
       </div>
       <div class="field">
-        <label class="label">Anio hasta</label>
+        <label class="label">A&ntilde;o hasta</label>
         <select id="h-hasta" class="select">
           {% for a in range(anio_actual, 1989, -1) %}
           <option value="{{ a }}" {% if a == anio_actual %}selected{% endif %}>{{ a }}</option>
@@ -148,11 +148,11 @@
 
 {% if resumen %}
 <section class="card" style="margin-top:18px;">
-  <div class="card-head"><div class="card-title">Resumen por tipo y anio</div></div>
+  <div class="card-head"><div class="card-title">Resumen por tipo y a&ntilde;o</div></div>
   <div class="card-body tight">
     <table class="summary-table">
       <thead>
-        <tr><th>Tipo</th><th>Anio</th><th>Intentados</th><th>Descargados</th><th>%</th></tr>
+        <tr><th>Tipo</th><th>A&ntilde;o</th><th>Intentados</th><th>Descargados</th><th>%</th></tr>
       </thead>
       <tbody>
         {% for row in resumen %}
@@ -249,7 +249,7 @@ async function checkNovedades(){
   const response = await fetch('/api/scraper/novedades', {method: 'POST'});
   const data = await response.json();
   if(data.ok){
-    log('Verificando novedades del anio actual...', 'log-warn');
+    log('Verificando novedades del año actual...', 'log-warn');
     setBtns(true);
     poll();
   } else {

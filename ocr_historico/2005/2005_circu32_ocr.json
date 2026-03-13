@@ -1,0 +1,35 @@
+{
+  "source_url": "https://www.sii.cl/documentos/circulares/2005/circu32.htm",
+  "document_id": "2005_circu32",
+  "fetched_at": "2026-03-12T22:49:49",
+  "header": {
+    "titulo_html": "Circular Nº 32 del 20 de Junio del 2005",
+    "materia_html": "Instruye sobre las acciones de presencia y de verificación de la Representación Impresa de un Documento Tributario Electrónico",
+    "texto": "Circular Nº 32 del 20 de Junio del 2005\nMATERIA: Instruye sobre las acciones de presencia y de verificación de la Representación Impresa de un Documento Tributario Electrónico"
+  },
+  "pages": [
+    {
+      "page_index": 1,
+      "image_url": "https://www.sii.cl/documentos/circulares/2005/circu32_a.gif",
+      "original_image_path": "img_historico/2005/2005_circu32_01.gif",
+      "ocr_engine_used": "tesseract",
+      "raw_text": "ELECTRONICAS S.A. RUE: 77.77.0777\n— FACTURA ELECTRONICA\nGiro: Insumos de Computación\nTeatinas 120, Fiso £ - Santiago ‘Nº 00107\nTelefono 3951376 SAL - SANTIACO CETRO.\nSefior (28): RECEPTOR DE FACTURA LIDA RUT. 78.888.888-8\nDirección: SAN DIEGO 2222 Giro: COMPUTACION\nEsp ias pa al vaa\nNRO SAA\nyA",
+      "normalized_text": "ELECTRONICAS S.A. RUE: 77.77.0777 — FACTURA ELECTRONICA Giro: Insumos de Computación Teatinas 120, Fiso £ - Santiago ‘Nº 00107 Telefono 3951376 SAL - SANTIACO CETRO. Sefior (28): RECEPTOR DE FACTURA LIDA RUT. 78.888.888-8 Dirección: SAN DIEGO 2222 Giro: COMPUTACION Esp ias pa al vaa NRO SAA yA",
+      "confidence": null
+    },
+    {
+      "page_index": 2,
+      "image_url": "https://www.sii.cl/documentos/circulares/2005/circu32_b.gif",
+      "original_image_path": "img_historico/2005/2005_circu32_02.gif",
+      "ocr_engine_used": "tesseract",
+      "raw_text": "Lectura de Tirnbre\nElectrónico con Lector mm:\nde Código de Barras ==\nTimbre ilegible: Timbre legible\nsin mensaje\no Mensaje de error > Mensaje >\nVerificación Timbre inconsistente Timbre consistente\nen Intranet\n‘fica cic ‘ewan az\nVerificación verificación a\nen Intranet visual con datos\ndel docurnento\nLied\nDatos Datos no\ncorresponden => corresponden =>\nTimbre valido Timbre Invalido\nVerificación\nen Intranet",
+      "normalized_text": "Lectura de Tirnbre Electrónico con Lector mm: de Código de Barras == Timbre ilegible: Timbre legible sin mensaje o Mensaje de error > Mensaje > Verificación Timbre inconsistente Timbre consistente en Intranet ‘fica cic ‘ewan az Verificación verificación a en Intranet visual con datos del docurnento Lied Datos Datos no corresponden => corresponden => Timbre valido Timbre Invalido Verificación en Intranet",
+      "confidence": null
+    }
+  ],
+  "full_text_raw": "Circular Nº 32 del 20 de Junio del 2005\nMATERIA: Instruye sobre las acciones de presencia y de verificación de la Representación Impresa de un Documento Tributario Electrónico\n\n[PAGINA 1]\nELECTRONICAS S.A. RUE: 77.77.0777\n— FACTURA ELECTRONICA\nGiro: Insumos de Computación\nTeatinas 120, Fiso £ - Santiago ‘Nº 00107\nTelefono 3951376 SAL - SANTIACO CETRO.\nSefior (28): RECEPTOR DE FACTURA LIDA RUT. 78.888.888-8\nDirección: SAN DIEGO 2222 Giro: COMPUTACION\nEsp ias pa al vaa\nNRO SAA\nyA\n\n[PAGINA 2]\nLectura de Tirnbre\nElectrónico con Lector mm:\nde Código de Barras ==\nTimbre ilegible: Timbre legible\nsin mensaje\no Mensaje de error > Mensaje >\nVerificación Timbre inconsistente Timbre consistente\nen Intranet\n‘fica cic ‘ewan az\nVerificación verificación a\nen Intranet visual con datos\ndel docurnento\nLied\nDatos Datos no\ncorresponden => corresponden =>\nTimbre valido Timbre Invalido\nVerificación\nen Intranet",
+  "full_text_normalized": "Circular Nº 32 del 20 de Junio del 2005\nMATERIA: Instruye sobre las acciones de presencia y de verificación de la Representación Impresa de un Documento Tributario Electrónico\n\n[PAGINA 1]\nELECTRONICAS S.A. RUE: 77.77.0777 — FACTURA ELECTRONICA Giro: Insumos de Computación Teatinas 120, Fiso £ - Santiago ‘Nº 00107 Telefono 3951376 SAL - SANTIACO CETRO. Sefior (28): RECEPTOR DE FACTURA LIDA RUT. 78.888.888-8 Dirección: SAN DIEGO 2222 Giro: COMPUTACION Esp ias pa al vaa NRO SAA yA\n\n[PAGINA 2]\nLectura de Tirnbre Electrónico con Lector mm: de Código de Barras == Timbre ilegible: Timbre legible sin mensaje o Mensaje de error > Mensaje > Verificación Timbre inconsistente Timbre consistente en Intranet ‘fica cic ‘ewan az Verificación verificación a en Intranet visual con datos del docurnento Lied Datos Datos no corresponden => corresponden => Timbre valido Timbre Invalido Verificación en Intranet",
+  "pdf_local": "pdfs/circular/2005/circular_historica_2005_circu32_scan.pdf",
+  "html_original": "html_historico/2005/2005_circu32_original.html",
+  "html_limpio": "html_historico/2005/2005_circu32_limpio.html"
+}

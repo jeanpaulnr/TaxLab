@@ -12,7 +12,10 @@
 .doc-shell{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:18px;align-items:start}
 .doc-section + .doc-section{margin-top:18px}
 .doc-title{font-family:'Crimson Pro',serif;font-size:38px;font-weight:700;line-height:1.08}
+.doc-ref{font-family:'DM Mono',monospace;font-size:12px;letter-spacing:1.4px;text-transform:uppercase;color:var(--accent)}
+.doc-title-secondary{margin-top:12px;font-size:18px;line-height:1.7;color:var(--text-soft)}
 .doc-sub{margin-top:10px;color:var(--text-soft);font-size:15px;line-height:1.8}
+.doc-callout{margin-top:16px}
 .meta-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:16px}
 .meta-grid.judicial{grid-template-columns:repeat(4,minmax(0,1fr))}
 .meta-box{padding:14px;border:1px solid var(--line);border-radius:14px;background:var(--panel-2)}
@@ -40,7 +43,9 @@
 .cita-label{margin-bottom:6px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:var(--accent)}
 .cita-copy{font-size:14px;line-height:1.75;color:var(--text-soft);user-select:all}
 .sidebar-stack{display:grid;gap:18px}
-.text-truncate{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:5;overflow:hidden}
+.text-preview{max-height:980px;overflow:auto;padding-right:6px}
+.text-preview::-webkit-scrollbar{width:10px}
+.text-preview::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:999px}
 @media (max-width: 1100px){.doc-shell{grid-template-columns:1fr}.meta-grid,.meta-grid.judicial,.norma-grid{grid-template-columns:1fr}}
 </style>
 {% endblock %}
@@ -50,16 +55,22 @@
   <div>
     <section class="card doc-section">
       <div class="card-body">
-        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;align-items:center;">
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;align-items:center;">
           <span class="badge info">{{ doc.tipo }}</span>
           {% for ley in doc.leyes_citadas %}<span class="badge">{{ ley }}</span>{% endfor %}
           {% if not doc.vigente %}<span class="badge danger">Derogada o modificada</span>{% endif %}
         </div>
-        <div class="doc-title">{{ doc.titulo }}</div>
-        <div class="doc-sub">{{ doc.referencia }}</div>
+        <div class="doc-ref">Referencia can&oacute;nica</div>
+        <div class="doc-title">{{ doc.referencia or doc.titulo }}</div>
+        {% if doc.titulo and doc.titulo != doc.referencia %}
+        <div class="doc-title-secondary">{{ doc.titulo }}</div>
+        {% endif %}
+        {% if doc.tipo != 'circular' and doc.titulo and 'Circular N' in doc.titulo %}
+        <div class="flash-inline doc-callout">Este registro es un {{ doc.tipo }} que cita o interpreta una circular. La identidad del documento est&aacute; dada por su referencia can&oacute;nica y su PDF local.</div>
+        {% endif %}
         <div class="meta-grid {% if doc.tipo == 'judicial' %}judicial{% endif %}">
           <div class="meta-box"><div class="meta-label">Fecha</div><div class="meta-value">{{ doc.fecha or doc.anio or '-' }}</div></div>
-          <div class="meta-box"><div class="meta-label">Paginas</div><div class="meta-value">{{ doc.paginas or '-' }}</div></div>
+          <div class="meta-box"><div class="meta-label">P&aacute;ginas</div><div class="meta-value">{{ doc.paginas or '-' }}</div></div>
           <div class="meta-box"><div class="meta-label">Chars</div><div class="meta-value">{{ doc.chars_texto or '-' }}</div></div>
           {% if doc.tipo == 'judicial' %}
           <div class="meta-box"><div class="meta-label">Corte</div><div class="meta-value">{{ doc.corte or '-' }}</div></div>
@@ -68,7 +79,7 @@
           <div class="meta-box"><div class="meta-label">Rol / codigo</div><div class="meta-value">{{ doc.numero or '-' }}</div></div>
           <div class="meta-box"><div class="meta-label">SII ID</div><div class="meta-value">{{ doc.sii_id or '-' }}</div></div>
           {% else %}
-          <div class="meta-box"><div class="meta-label">Numero</div><div class="meta-value">{{ doc.numero or '-' }}</div></div>
+          <div class="meta-box"><div class="meta-label">N&uacute;mero</div><div class="meta-value">{{ doc.numero or '-' }}</div></div>
           {% endif %}
         </div>
         <div class="inline-actions" style="margin-top:16px;">
@@ -136,9 +147,13 @@
         {% if doc.tipo == 'judicial' %}
         <div class="rich-copy">{{ doc.contenido }}</div>
         {% else %}
-        <div class="rich-copy">{{ doc.contenido[:8000] }}{% if doc.contenido|length > 8000 %}
-
-[Texto truncado para visualizacion - {{ doc.chars_texto or 0 }} caracteres totales]{% endif %}</div>
+        {% if doc.pdf_url %}
+        <div class="flash-inline" style="margin-bottom:14px;">Se recomienda abrir el documento en PDF para revisi&oacute;n completa. Esta vista muestra una previsualizaci&oacute;n del texto extra&iacute;do para lectura r&aacute;pida y verificaci&oacute;n.</div>
+        {% endif %}
+        <div class="rich-copy text-preview">{{ doc.contenido[:12000] }}</div>
+        {% if doc.contenido|length > 12000 %}
+        <div class="flash-inline" style="margin-top:14px;">La previsualizaci&oacute;n se acota para mantener esta ficha legible. El documento contiene {{ doc.chars_texto or 0 }} caracteres extra&iacute;dos en total y su versi&oacute;n can&oacute;nica es el PDF local.</div>
+        {% endif %}
         {% endif %}
       </div>
     </section>

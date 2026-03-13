@@ -60,7 +60,7 @@ def descargar_resoluciones(anio, max_num=300, delay=0.5):
             consecutivos_404 += 1
             # Si llevamos 30 seguidos sin encontrar, probablemente ya no hay más
             if consecutivos_404 >= 30:
-                print(f"  [{num}] 30 consecutivos sin PDF — parando año {anio}")
+                print(f"  [{num}] 30 consecutivos sin PDF - parando año {anio}")
                 break
             continue
         
@@ -137,8 +137,8 @@ def descargar_resoluciones(anio, max_num=300, delay=0.5):
     
     print(f"\n  RESULTADO {anio}:")
     print(f"  Nuevas:          {nuevos}")
-    print(f"  ⏭  Ya existían:  {existentes}")
-    print(f"  ❌ No encontradas: {no_encontrados}")
+    print(f"  SKIP Ya existían:  {existentes}")
+    print(f"  MISS No encontradas: {no_encontrados}")
     print(f"  Errores:         {errores}")
     
     return {'anio': anio, 'nuevos': nuevos, 'existentes': existentes, 

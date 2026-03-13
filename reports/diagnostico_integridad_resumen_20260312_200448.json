@@ -1,0 +1,297 @@
+{
+  "resumen": {
+    "generated_at": "2026-03-12T20:04:48.854625",
+    "db_path": "C:\\Users\\jeanp\\Programas\\sii_normativa_v2.1\\data\\sii_normativa.db",
+    "desde": 2019,
+    "hasta": 2026,
+    "total_documentos": 3869,
+    "por_tipo": [
+      {
+        "tipo": "circular",
+        "total": 433
+      },
+      {
+        "tipo": "oficio",
+        "total": 2317
+      },
+      {
+        "tipo": "resolucion",
+        "total": 1119
+      }
+    ],
+    "documentos_contenido_vacio": 0,
+    "documentos_chars_cero": 0,
+    "documentos_sin_pdf": 0,
+    "documentos_paginas_cero": 0,
+    "documentos_sin_hash": 0,
+    "documentos_sin_pdf_size": 0,
+    "sospechosos_truncacion": 0,
+    "demasiado_cortos": 31
+  },
+  "por_anio": [
+    {
+      "tipo": "circular",
+      "anio": 2026,
+      "docs": 10,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 2706,
+      "avg_len": 9966.4,
+      "max_len": 40314
+    },
+    {
+      "tipo": "oficio",
+      "anio": 2026,
+      "docs": 53,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 1949,
+      "avg_len": 4823.2,
+      "max_len": 15035
+    },
+    {
+      "tipo": "resolucion",
+      "anio": 2026,
+      "docs": 40,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 2578,
+      "avg_len": 11500.0,
+      "max_len": 51844
+    },
+    {
+      "tipo": "circular",
+      "anio": 2025,
+      "docs": 68,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 1510,
+      "avg_len": 22118.9,
+      "max_len": 123312
+    },
+    {
+      "tipo": "oficio",
+      "anio": 2025,
+      "docs": 197,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 140,
+      "avg_len": 4610.6,
+      "max_len": 17891
+    },
+    {
+      "tipo": "resolucion",
+      "anio": 2025,
+      "docs": 208,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 2161,
+      "avg_len": 12766.8,
+      "max_len": 102889
+    },
+    {
+      "tipo": "circular",
+      "anio": 2024,
+      "docs": 54,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 1475,
+      "avg_len": 15317.6,
+      "max_len": 110093
+    },
+    {
+      "tipo": "oficio",
+      "anio": 2024,
+      "docs": 151,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 1235,
+      "avg_len": 4910.2,
+      "max_len": 12326
+    },
+    {
+      "tipo": "resolucion",
+      "anio": 2024,
+      "docs": 132,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 2240,
+      "avg_len": 10345.2,
+      "max_len": 48048
+    },
+    {
+      "tipo": "circular",
+      "anio": 2023,
+      "docs": 54,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 1721,
+      "avg_len": 10724.8,
+      "max_len": 49825
+    },
+    {
+      "tipo": "oficio",
+      "anio": 2023,
+      "docs": 384,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 1023,
+      "avg_len": 4815.7,
+      "max_len": 21141
+    },
+    {
+      "tipo": "resolucion",
+      "anio": 2023,
+      "docs": 149,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 1948,
+      "avg_len": 10713.1,
+      "max_len": 105243
+    },
+    {
+      "tipo": "circular",
+      "anio": 2022,
+      "docs": 58,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 178,
+      "avg_len": 18548.3,
+      "max_len": 116521
+    },
+    {
+      "tipo": "oficio",
+      "anio": 2022,
+      "docs": 572,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 621,
+      "avg_len": 4989.0,
+      "max_len": 16417
+    },
+    {
+      "tipo": "resolucion",
+      "anio": 2022,
+      "docs": 127,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 2019,
+      "avg_len": 11106.0,
+      "max_len": 71648
+    },
+    {
+      "tipo": "circular",
+      "anio": 2021,
+      "docs": 67,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 59,
+      "avg_len": 26186.4,
+      "max_len": 235818
+    },
+    {
+      "tipo": "oficio",
+      "anio": 2021,
+      "docs": 490,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 1073,
+      "avg_len": 6479.4,
+      "max_len": 18693
+    },
+    {
+      "tipo": "resolucion",
+      "anio": 2021,
+      "docs": 143,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 2040,
+      "avg_len": 11397.8,
+      "max_len": 43844
+    },
+    {
+      "tipo": "circular",
+      "anio": 2020,
+      "docs": 73,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 772,
+      "avg_len": 30622.2,
+      "max_len": 447142
+    },
+    {
+      "tipo": "oficio",
+      "anio": 2020,
+      "docs": 271,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 2209,
+      "avg_len": 8322.9,
+      "max_len": 21463
+    },
+    {
+      "tipo": "resolucion",
+      "anio": 2020,
+      "docs": 175,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 1424,
+      "avg_len": 9606.4,
+      "max_len": 41824
+    },
+    {
+      "tipo": "circular",
+      "anio": 2019,
+      "docs": 49,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 1322,
+      "avg_len": 8372.7,
+      "max_len": 30419
+    },
+    {
+      "tipo": "oficio",
+      "anio": 2019,
+      "docs": 199,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 2615,
+      "avg_len": 10883.6,
+      "max_len": 35232
+    },
+    {
+      "tipo": "resolucion",
+      "anio": 2019,
+      "docs": 145,
+      "sospechosos_truncados": 0,
+      "sin_chars": 0,
+      "sin_paginas": 0,
+      "min_len": 1469,
+      "avg_len": 7966.6,
+      "max_len": 41291
+    }
+  ]
+}
