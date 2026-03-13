@@ -13,11 +13,14 @@ import hashlib
 import threading
 import logging
 import textwrap
+import unicodedata
 from datetime import datetime, date
 
 import fitz
 
 from migraciones import run_migrations
+from document_analysis import generate_document_analysis
+from normativa_refs import CANONICAL_BODIES, build_article_ref, exact_article_refs, normalize_article_value, normalize_body_code, parse_article_ref_list
 from rag import responder_consulta_tributaria
 from pdf_layout import build_pdf_path
 
@@ -113,9 +116,32 @@ CREATE TABLE IF NOT EXISTS articulos_idx (
     articulo TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_art_ley ON articulos_idx(ley, articulo);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_art_doc_ley_art ON articulos_idx(doc_id, ley, articulo);
 CREATE INDEX IF NOT EXISTS idx_doc_tipo ON documentos(tipo, anio);
 CREATE INDEX IF NOT EXISTS idx_doc_hash ON documentos(hash_md5);
 CREATE INDEX IF NOT EXISTS idx_doc_fuente ON documentos(fuente);
+CREATE TABLE IF NOT EXISTS document_analysis (
+    id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+    doc_id                INTEGER NOT NULL UNIQUE REFERENCES documentos(id) ON DELETE CASCADE,
+    status                TEXT DEFAULT 'pending',
+    source_hash           TEXT,
+    model                 TEXT,
+    prompt_version        TEXT,
+    summary_short         TEXT,
+    summary_technical     TEXT,
+    question_resolved     TEXT,
+    holding_principal     TEXT,
+    implicancia_practica  TEXT,
+    normas_citadas_json   TEXT,
+    articulos_citados_json TEXT,
+    evidence_json         TEXT,
+    confidence            TEXT,
+    notes                 TEXT,
+    generated_at          TEXT,
+    created_at            TEXT DEFAULT (datetime('now')),
+    updated_at            TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_document_analysis_status ON document_analysis(status);
 CREATE TABLE IF NOT EXISTS judicial_docs (
     doc_id      INTEGER PRIMARY KEY REFERENCES documentos(id) ON DELETE CASCADE,
     sii_id      INTEGER UNIQUE,
@@ -160,7 +186,7 @@ CREATE TABLE IF NOT EXISTS scheduler_config (
 """
 
 MATERIAS_FALLBACK = []
-LEYES_FALLBACK = ['LIR', 'LIVS', 'CT', 'LTE', 'LH', 'LMT', 'LRT']
+LEYES_FALLBACK = list(CANONICAL_BODIES)
 
 
 def get_asset_path(stored_path):
@@ -259,6 +285,61 @@ def safe_json_loads(value, default=None):
         return list(default) if isinstance(default, list) else default
 
 
+def normalize_law_codes(values):
+    seen = set()
+    normalized = []
+    for value in values or []:
+        code = normalize_body_code(value)
+        if not code or code in seen:
+            continue
+        seen.add(code)
+        normalized.append(code)
+    return [code for code in CANONICAL_BODIES if code in seen]
+
+
+def parse_exact_article_refs(value):
+    return exact_article_refs(value)
+
+
+def parse_ambiguous_article_refs(value):
+    return [ref for ref in parse_article_ref_list(value) if ref.get('ambigua')]
+
+
+def article_ref_chip(ref):
+    if not ref:
+        return ''
+    if ref.get('ambigua'):
+        articulo = ref.get('articulo') or ''
+        return f'Art. {articulo} ambiguo'.strip()
+    return ref.get('label') or ''
+
+
+def build_article_match_value(articulo):
+    return normalize_article_value(articulo)
+
+
+def load_document_analysis(doc_id):
+    conn = get_db()
+    try:
+        row = conn.execute(
+            """
+            SELECT *
+            FROM document_analysis
+            WHERE doc_id = ?
+            """,
+            (doc_id,),
+        ).fetchone()
+        if not row:
+            return None
+        analysis = dict(row)
+        analysis['normas_citadas'] = normalize_law_codes(safe_json_loads(analysis.get('normas_citadas_json')))
+        analysis['articulos_citados'] = parse_exact_article_refs(analysis.get('articulos_citados_json'))
+        analysis['evidence'] = safe_json_loads(analysis.get('evidence_json'))
+        return analysis
+    finally:
+        conn.close()
+
+
 def tipo_formal(tipo):
     return {
         'circular': 'Circular',
@@ -266,6 +347,121 @@ def tipo_formal(tipo):
         'resolucion': 'Resolucion Exenta',
         'judicial': 'Jurisprudencia Judicial',
     }.get(tipo, str(tipo).capitalize())
+
+
+DISPLAY_REPLACEMENTS = (
+    (r'\bley\s+sombre\b', 'Ley sobre'),
+    (r'\bresoluciónes\b', 'Resoluciones'),
+    (r'\bresoluciones ex\.\b', 'Resoluciones Ex.'),
+)
+
+
+def normalize_display_text(value):
+    if not value:
+        return ''
+    text = str(value).replace('\r', '\n')
+    for pattern, replacement in DISPLAY_REPLACEMENTS:
+        text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
+    text = re.sub(r'[ \t]+', ' ', text)
+    text = re.sub(r' *\n *', '\n', text)
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    return text.strip()
+
+
+def _text_fingerprint(value):
+    text = normalize_display_text(value)
+    text = ''.join(ch for ch in unicodedata.normalize('NFKD', text) if not unicodedata.combining(ch))
+    text = text.lower()
+    return re.sub(r'[^a-z0-9]+', '', text)
+
+
+def _looks_like_heading(line):
+    letters = [ch for ch in line if ch.isalpha()]
+    if not letters:
+        return False
+    upper_ratio = sum(1 for ch in letters if ch.isupper()) / len(letters)
+    return upper_ratio >= 0.82 and len(line.strip()) >= 24
+
+
+def _is_redundant_line(line, *candidates):
+    fp = _text_fingerprint(line)
+    if not fp:
+        return True
+    if fp.startswith('home') or fp.startswith('resultadodestacado') or 'ingresountermino' in fp:
+        return True
+    for candidate in candidates:
+        cfp = _text_fingerprint(candidate)
+        if not cfp:
+            continue
+        if fp == cfp or fp in cfp or cfp in fp:
+            return True
+    return False
+
+
+def build_display_subject(title, reference=''):
+    text = normalize_display_text(title)
+    if not text:
+        return ''
+    if _text_fingerprint(text) == _text_fingerprint(reference):
+        return ''
+    return text
+
+
+def build_preview_text(content, title='', reference=''):
+    text = normalize_display_text(content)
+    if not text:
+        return ''
+
+    lines = [line.strip() for line in text.split('\n')]
+    filtered = []
+    skipping_header = True
+
+    for line in lines:
+        if not line:
+            if filtered and filtered[-1] != '':
+                filtered.append('')
+            continue
+
+        if skipping_header:
+            if _is_redundant_line(line, title, reference):
+                continue
+            if re.search(r'^\(?(ord\.|oficio ordinario|resoluci[oó]n ex)', line, re.IGNORECASE):
+                continue
+            if _looks_like_heading(line):
+                continue
+            skipping_header = False
+
+        filtered.append(line)
+
+    preview = normalize_display_text('\n'.join(filtered))
+    return preview or text
+
+
+def build_display_summary(summary, content, title='', reference=''):
+    candidate = normalize_display_text(summary)
+    preview = build_preview_text(content, title=title, reference=reference)
+    title_fp = _text_fingerprint(title)
+    candidate_fp = _text_fingerprint(candidate)
+
+    if title_fp and candidate_fp and candidate_fp.startswith(title_fp[:90]):
+        candidate = preview
+
+    if not candidate:
+        candidate = preview
+    if not candidate:
+        return ''
+
+    lines = [line.strip() for line in candidate.split('\n') if line.strip()]
+    filtered = []
+    for line in lines:
+        if _is_redundant_line(line, title, reference):
+            continue
+        if re.search(r'^\(?(ord\.|oficio ordinario|resoluci[oó]n ex)', line, re.IGNORECASE):
+            continue
+        filtered.append(line)
+
+    text = normalize_display_text(' '.join(filtered))
+    return text or candidate
 
 
 
@@ -300,7 +496,7 @@ def get_catalog_laws(conn):
             ORDER BY ley
             """
         ).fetchall()
-        leyes.update(row[0] for row in rows if row[0])
+        leyes.update(normalize_body_code(row[0]) for row in rows if row[0])
     except sqlite3.OperationalError:
         pass
 
@@ -313,11 +509,13 @@ def get_catalog_laws(conn):
             """
         ).fetchall()
         for row in rows:
-            leyes.update(value for value in safe_json_loads(row[0]) if value)
+            leyes.update(normalize_body_code(value) for value in safe_json_loads(row[0]) if value)
     except sqlite3.OperationalError:
         pass
 
-    return sorted(leyes) or list(LEYES_FALLBACK)
+    leyes = {ley for ley in leyes if ley}
+    ordered = [ley for ley in CANONICAL_BODIES if ley in leyes]
+    return ordered or list(LEYES_FALLBACK)
 
 
 def get_catalog_sources(conn):
@@ -361,8 +559,24 @@ def get_catalog_context():
         )
         docs_recientes = [dict(row) for row in c.fetchall()]
 
-        c.execute('SELECT ley, articulo, COUNT(*) cnt FROM articulos_idx GROUP BY ley, articulo ORDER BY cnt DESC LIMIT 15')
-        top_arts = [dict(row) for row in c.fetchall()]
+        c.execute(
+            """
+            SELECT ley, articulo, COUNT(*) cnt
+            FROM articulos_idx
+            WHERE ley IS NOT NULL AND articulo IS NOT NULL
+            GROUP BY ley, articulo
+            ORDER BY cnt DESC
+            LIMIT 15
+            """
+        )
+        top_arts = []
+        for row in c.fetchall():
+            ref = build_article_ref(row['ley'], row['articulo'])
+            item = dict(row)
+            item['clave'] = ref['clave']
+            item['label'] = ref['label']
+            item['slug'] = ref['slug']
+            top_arts.append(item)
 
         c.execute("SELECT MAX(fecha_carga) FROM documentos")
         ultima_actualizacion = c.fetchone()[0]
@@ -435,9 +649,22 @@ def load_document_context(doc_id):
             return None
 
         doc = dict(row)
-        doc['leyes_citadas'] = safe_json_loads(doc.get('leyes_citadas'))
-        doc['articulos_clave'] = safe_json_loads(doc.get('articulos_clave'))
+        raw_article_refs = doc.get('articulos_clave')
+        doc['leyes_citadas'] = normalize_law_codes(safe_json_loads(doc.get('leyes_citadas')))
+        doc['articulos_clave'] = parse_exact_article_refs(raw_article_refs)
         doc['pdf_url'] = f'/documento/{doc_id}/pdf' if (doc.get('pdf_local') or doc.get('judicial_pdf_local')) else None
+        doc['tema_mostrable'] = build_display_subject(doc.get('titulo'), doc.get('referencia'))
+        doc['resumen_mostrable'] = build_display_summary(
+            doc.get('resumen'),
+            doc.get('contenido'),
+            title=doc.get('titulo'),
+            reference=doc.get('referencia'),
+        )
+        doc['preview_texto'] = build_preview_text(
+            doc.get('contenido'),
+            title=doc.get('titulo'),
+            reference=doc.get('referencia'),
+        )
 
         judicial_relaciones = []
         judicial_por_norma = []
@@ -466,33 +693,21 @@ def load_document_context(doc_id):
 
         relacionados = []
         articulos = doc['articulos_clave'][:4]
-        leyes_rel = doc['leyes_citadas'][:2]
-        if articulos and len(leyes_rel) == 1:
-            placeholders = ','.join(['?'] * len(articulos))
+        if articulos:
+            pair_clauses = ' OR '.join(['(ai.ley = ? AND ai.articulo = ?)'] * len(articulos))
+            pair_params = []
+            for ref in articulos:
+                pair_params.extend([ref['cuerpo'], ref['articulo']])
             c.execute(
                 f"""
                 SELECT DISTINCT d.id, d.tipo, d.numero, d.anio, d.titulo, d.referencia, d.materia, d.paginas
                 FROM articulos_idx ai
                 JOIN documentos d ON d.id = ai.doc_id
-                WHERE ai.ley = ? AND ai.articulo IN ({placeholders}) AND d.id != ?
+                WHERE ({pair_clauses}) AND d.id != ?
                 ORDER BY d.anio DESC
                 LIMIT 8
                 """,
-                [leyes_rel[0]] + articulos + [doc_id],
-            )
-            relacionados = [dict(row) for row in c.fetchall()]
-        elif articulos:
-            placeholders = ','.join(['?'] * len(articulos))
-            c.execute(
-                f"""
-                SELECT DISTINCT d.id, d.tipo, d.numero, d.anio, d.titulo, d.referencia, d.materia, d.paginas
-                FROM articulos_idx ai
-                JOIN documentos d ON d.id = ai.doc_id
-                WHERE ai.articulo IN ({placeholders}) AND d.id != ?
-                ORDER BY d.anio DESC
-                LIMIT 8
-                """,
-                articulos + [doc_id],
+                pair_params + [doc_id],
             )
             relacionados = [dict(row) for row in c.fetchall()]
 
@@ -513,6 +728,7 @@ def load_document_context(doc_id):
             'historial': historial,
             'judicial_relaciones': judicial_relaciones,
             'judicial_por_norma': judicial_por_norma,
+            'analysis': load_document_analysis(doc_id),
         }
     finally:
         conn.close()
@@ -695,14 +911,22 @@ def buscar():
             where.append('d.anio = ?')
             params.append(int(anio))
         if ley:
-            where.append('d.leyes_citadas LIKE ?')
-            params.append(f'%"{ley}"%')
+            ley = normalize_body_code(ley) or ley
+            where.append('EXISTS (SELECT 1 FROM articulos_idx ai_ley WHERE ai_ley.doc_id = d.id AND ai_ley.ley = ?)')
+            params.append(ley)
         if materia:
             where.append("COALESCE(d.materia, '') LIKE ?")
             params.append(f'%{materia}%')
         if articulo:
-            where.append('(d.articulos_clave LIKE ? OR jr.articulo LIKE ?)')
-            params.extend([f'%{articulo}%', f'%{articulo}%'])
+            articulo_match = build_article_match_value(articulo)
+            if ley:
+                where.append(
+                    'EXISTS (SELECT 1 FROM articulos_idx ai_art WHERE ai_art.doc_id = d.id AND ai_art.ley = ? AND ai_art.articulo = ?)'
+                )
+                params.extend([ley, articulo_match])
+            else:
+                where.append('(d.contenido LIKE ? OR d.articulos_clave LIKE ?)')
+                params.extend([f'%{articulo_match}%', f'%{articulo_match}%'])
         if corte:
             where.append('jd.corte = ?')
             params.append(corte)
@@ -729,7 +953,7 @@ def buscar():
                    d.vigente, d.paginas, d.chars_texto, d.url_sii,
                    jd.corte, jd.tribunal, jd.tipo_codigo, COALESCE(d.pdf_local, jd.pdf_local) AS pdf_local,
                    GROUP_CONCAT(DISTINCT jr.cuerpo_normativo) AS cuerpos_normativos,
-                   SUBSTR(d.contenido, 1, 700) AS extracto
+                   SUBSTR(d.contenido, 1, 2500) AS extracto
             {base_from}
             GROUP BY d.id
             ORDER BY COALESCE(d.fecha, '') DESC, d.id DESC
@@ -767,7 +991,13 @@ def buscar():
 
     resultados = []
     for row in rows:
-        extracto = row['resumen'] or row['extracto'] or ''
+        tema = build_display_subject(row['titulo'], row['referencia'])
+        extracto = build_display_summary(
+            row['resumen'],
+            row['extracto'],
+            title=row['titulo'],
+            reference=row['referencia'],
+        )
         if q:
             for word in q.split():
                 if len(word) > 2:
@@ -780,11 +1010,12 @@ def buscar():
             'anio': row['anio'],
             'fecha': row['fecha'],
             'titulo': row['titulo'],
+            'tema': tema,
             'materia': row['materia'],
             'referencia': row['referencia'],
             'extracto': extracto[:700] + ('...' if len(extracto) > 700 else ''),
-            'leyes': safe_json_loads(row['leyes_citadas']),
-            'articulos': safe_json_loads(row['articulos_clave'])[:5],
+            'leyes': normalize_law_codes(safe_json_loads(row['leyes_citadas'])),
+            'articulos': parse_exact_article_refs(row['articulos_clave'])[:5],
             'vigente': row['vigente'],
             'paginas': row['paginas'] or 0,
             'url_sii': row['url_sii'],
@@ -824,6 +1055,25 @@ def app_documento(doc_id):
         anio_actual=catalog_context['anio_actual'],
         **context,
     )
+
+
+@app.route('/api/documento/<int:doc_id>/analysis')
+def get_document_analysis(doc_id):
+    analysis = load_document_analysis(doc_id)
+    if not analysis:
+        return jsonify({'ok': False, 'analysis': None}), 404
+    return jsonify({'ok': True, 'analysis': analysis})
+
+
+@app.route('/api/documento/<int:doc_id>/analysis/generar', methods=['POST'])
+def generate_analysis(doc_id):
+    force = bool((request.get_json(silent=True) or {}).get('force'))
+    try:
+        analysis = generate_document_analysis(DB, doc_id, force=force)
+    except Exception as exc:
+        log.exception('Error generando document_analysis para %s', doc_id)
+        return jsonify({'ok': False, 'error': str(exc)}), 500
+    return jsonify({'ok': True, 'analysis': analysis})
 
 
 @app.route('/documento/<int:doc_id>/pdf')
@@ -901,22 +1151,25 @@ def cita(doc_id):
 
 @app.route('/api/articulo')
 def por_articulo():
-    ley = request.args.get('ley', '')
-    articulo = request.args.get('art', '')
+    ley = normalize_body_code(request.args.get('ley', '')) or ''
+    articulo = build_article_match_value(request.args.get('art', ''))
     conn = get_db()
     try:
-        rows = conn.execute(
-            """
-            SELECT DISTINCT d.id, d.tipo, d.numero, d.anio, d.titulo, d.referencia, d.materia, d.resumen
-            FROM articulos_idx ai
-            JOIN documentos d ON d.id = ai.doc_id
-            WHERE (?='' OR ai.ley=?) AND (?='' OR ai.articulo LIKE ?)
-            ORDER BY d.anio DESC
-            LIMIT 100
-            """,
-            (ley, ley, articulo, f'%{articulo}%'),
-        ).fetchall()
-        docs = [dict(row) for row in rows]
+        if not ley or not articulo:
+            docs = []
+        else:
+            rows = conn.execute(
+                """
+                SELECT DISTINCT d.id, d.tipo, d.numero, d.anio, d.titulo, d.referencia, d.materia, d.resumen
+                FROM articulos_idx ai
+                JOIN documentos d ON d.id = ai.doc_id
+                WHERE ai.ley = ? AND ai.articulo = ?
+                ORDER BY d.anio DESC
+                LIMIT 100
+                """,
+                (ley, articulo),
+            ).fetchall()
+            docs = [dict(row) for row in rows]
     finally:
         conn.close()
     return jsonify({'docs': docs, 'total': len(docs)})

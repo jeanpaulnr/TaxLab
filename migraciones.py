@@ -37,6 +37,31 @@ CREATE INDEX IF NOT EXISTS idx_caso_notas_caso ON caso_notas(caso_id);
 CREATE INDEX IF NOT EXISTS idx_caso_notas_doc ON caso_notas(doc_id);
 """
 
+DOCUMENT_ANALYSIS_SQL = """
+CREATE TABLE IF NOT EXISTS document_analysis (
+    id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+    doc_id                 INTEGER NOT NULL UNIQUE REFERENCES documentos(id) ON DELETE CASCADE,
+    status                 TEXT DEFAULT 'pending',
+    source_hash            TEXT,
+    model                  TEXT,
+    prompt_version         TEXT,
+    summary_short          TEXT,
+    summary_technical      TEXT,
+    question_resolved      TEXT,
+    holding_principal      TEXT,
+    implicancia_practica   TEXT,
+    normas_citadas_json    TEXT,
+    articulos_citados_json TEXT,
+    evidence_json          TEXT,
+    confidence             TEXT,
+    notes                  TEXT,
+    generated_at           TEXT,
+    created_at             TEXT DEFAULT (datetime('now')),
+    updated_at             TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_document_analysis_status ON document_analysis(status);
+"""
+
 
 def get_connection(db_path=DB):
     conn = sqlite3.connect(db_path)
@@ -64,6 +89,8 @@ def run_migrations(db_path=DB):
     try:
         conn.executescript(CASOS_SQL)
         applied.append('tablas_casos')
+        conn.executescript(DOCUMENT_ANALYSIS_SQL)
+        applied.append('tabla_document_analysis')
         conn.executescript(
             """
             CREATE TRIGGER IF NOT EXISTS docs_au AFTER UPDATE ON documentos BEGIN
@@ -85,6 +112,9 @@ def run_migrations(db_path=DB):
 
             conn.execute('CREATE INDEX IF NOT EXISTS idx_doc_fuente ON documentos(fuente)')
             applied.append('idx_doc_fuente')
+            if table_exists(conn, 'articulos_idx'):
+                conn.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_art_doc_ley_art ON articulos_idx(doc_id, ley, articulo)')
+                applied.append('idx_art_doc_ley_art')
 
             if table_exists(conn, 'judicial_docs') and column_exists(conn, 'documentos', 'pdf_local'):
                 conn.execute(

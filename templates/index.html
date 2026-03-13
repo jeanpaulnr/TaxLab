@@ -118,7 +118,7 @@
             {% endfor %}
           </select>
         </div>
-        <div class="field"><label class="label">Ley citada</label>
+        <div class="field"><label class="label">Cuerpo normativo citado</label>
           <select id="f-ley" class="select" onchange="buscar(1)">
             <option value="">Todas</option>
             {% for ley in leyes %}
@@ -126,7 +126,7 @@
             {% endfor %}
           </select>
         </div>
-        <div class="field"><label class="label">Articulo</label><input id="f-art" class="input" type="text" placeholder="31, 14 D, 200" oninput="debounced()"></div>
+        <div class="field"><label class="label">Art&iacute;culo (requiere cuerpo)</label><input id="f-art" class="input" type="text" placeholder="31, 14 inciso primero, 8 letra h" oninput="debounced()"></div>
         <div class="field"><label class="label">Materia</label>
           <select id="f-mat" class="select" onchange="buscar(1)">
             <option value="">Todas</option>
@@ -159,7 +159,7 @@
       <div class="panel-title">Articulos mas citados</div>
       <div>
         {% for art in top_arts %}
-        <span class="art-chip" onclick="filtrarArt('{{ art.ley }}', '{{ art.articulo }}')"><span class="art-ley">{{ art.ley }}</span>{{ art.articulo }}</span>
+        <span class="art-chip" onclick="filtrarArt('{{ art.ley }}', '{{ art.articulo }}')"><span class="art-ley">{{ art.ley }}</span>Art. {{ art.articulo }}</span>
         {% endfor %}
       </div>
     </section>
@@ -270,12 +270,13 @@ function setQ(texto){
 
 function filtrarArt(ley, articulo){
   document.getElementById('f-ley').value = ley;
-  document.getElementById('f-art').value = String(articulo).replace('art. ', '');
+  document.getElementById('f-art').value = String(articulo);
   buscar(1);
 }
 
-function filtrarArtTag(articulo){
-  document.getElementById('f-art').value = String(articulo).replace('art. ', '');
+function filtrarArtTag(cuerpo, articulo){
+  document.getElementById('f-ley').value = cuerpo;
+  document.getElementById('f-art').value = String(articulo);
   buscar(1);
 }
 
@@ -352,13 +353,13 @@ async function buscar(p=1){
 
   resultsEl.innerHTML = data.resultados.map((r) => {
     const leyes = (r.leyes || []).map((ley) => `<span class="badge">${ley}</span>`).join('');
-    const articulos = (r.articulos || []).map((art) => `<span class="tag" onclick="filtrarArtTag('${String(art).replaceAll("'", "\\'")}')">${art}</span>`).join('');
+    const articulos = (r.articulos || []).map((art) => `<span class="tag" onclick="filtrarArtTag('${String(art.cuerpo).replaceAll("'", "\\'")}', '${String(art.articulo).replaceAll("'", "\\'")}')">${art.label}</span>`).join('');
     const cuerpos = (r.cuerpos_normativos || []).slice(0, 3).map((cuerpo) => `<span class="meta-chip">${cuerpo}</span>`).join('');
     const referenciaPrincipal = r.referencia || r.titulo || '';
-    const tituloSecundario = r.titulo && r.referencia && r.titulo !== r.referencia
-      ? `<div class="result-context">${r.titulo}</div>`
+    const tituloSecundario = r.tema
+      ? `<div class="result-context"><strong style="color:var(--text);font-weight:600;">Tema tratado:</strong> ${r.tema}</div>`
       : '';
-    const referenciaCruzada = r.tipo !== 'circular' && /Circular N/i.test(r.titulo || '')
+    const referenciaCruzada = r.tipo !== 'circular' && /Circular N/i.test(r.tema || '')
       ? '<span class="badge warning">Referencia a circular</span>'
       : '';
     const judicialMeta = r.tipo === 'judicial'

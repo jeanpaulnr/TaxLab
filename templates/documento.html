@@ -13,7 +13,9 @@
 .doc-section + .doc-section{margin-top:18px}
 .doc-title{font-family:'Crimson Pro',serif;font-size:38px;font-weight:700;line-height:1.08}
 .doc-ref{font-family:'DM Mono',monospace;font-size:12px;letter-spacing:1.4px;text-transform:uppercase;color:var(--accent)}
-.doc-title-secondary{margin-top:12px;font-size:18px;line-height:1.7;color:var(--text-soft)}
+.doc-title-secondary{margin-top:14px;padding:14px 16px;border:1px solid var(--line);border-radius:14px;background:var(--panel-2)}
+.doc-title-secondary-label{margin-bottom:6px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:var(--accent)}
+.doc-title-secondary-copy{font-size:16px;line-height:1.75;color:var(--text-soft)}
 .doc-sub{margin-top:10px;color:var(--text-soft);font-size:15px;line-height:1.8}
 .doc-callout{margin-top:16px}
 .meta-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:16px}
@@ -44,6 +46,12 @@
 .cita-copy{font-size:14px;line-height:1.75;color:var(--text-soft);user-select:all}
 .sidebar-stack{display:grid;gap:18px}
 .text-preview{max-height:980px;overflow:auto;padding-right:6px}
+.analysis-grid{display:grid;gap:14px}
+.analysis-box{padding:14px;border:1px solid var(--line);border-radius:14px;background:var(--panel-2)}
+.analysis-label{margin-bottom:6px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:var(--accent)}
+.analysis-meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.evidence-list{display:grid;gap:10px;margin-top:10px}
+.evidence-box{padding:12px;border:1px solid var(--line-soft);border-radius:12px;background:rgba(255,255,255,.02)}
 .text-preview::-webkit-scrollbar{width:10px}
 .text-preview::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:999px}
 @media (max-width: 1100px){.doc-shell{grid-template-columns:1fr}.meta-grid,.meta-grid.judicial,.norma-grid{grid-template-columns:1fr}}
@@ -62,10 +70,13 @@
         </div>
         <div class="doc-ref">Referencia can&oacute;nica</div>
         <div class="doc-title">{{ doc.referencia or doc.titulo }}</div>
-        {% if doc.titulo and doc.titulo != doc.referencia %}
-        <div class="doc-title-secondary">{{ doc.titulo }}</div>
+        {% if doc.tema_mostrable %}
+        <div class="doc-title-secondary">
+          <div class="doc-title-secondary-label">Tema tratado</div>
+          <div class="doc-title-secondary-copy">{{ doc.tema_mostrable }}</div>
+        </div>
         {% endif %}
-        {% if doc.tipo != 'circular' and doc.titulo and 'Circular N' in doc.titulo %}
+        {% if doc.tipo != 'circular' and doc.tema_mostrable and 'Circular N' in doc.tema_mostrable %}
         <div class="flash-inline doc-callout">Este registro es un {{ doc.tipo }} que cita o interpreta una circular. La identidad del documento est&aacute; dada por su referencia can&oacute;nica y su PDF local.</div>
         {% endif %}
         <div class="meta-grid {% if doc.tipo == 'judicial' %}judicial{% endif %}">
@@ -89,10 +100,73 @@
       </div>
     </section>
 
-    {% if doc.resumen %}
+    {% if analysis or doc.resumen_mostrable %}
     <section class="card doc-section">
-      <div class="card-head"><div class="card-title">Resumen ejecutivo</div></div>
-      <div class="card-body"><div class="rich-copy">{{ doc.resumen }}</div></div>
+      <div class="card-head"><div class="card-title">Asunto y s&iacute;ntesis</div></div>
+      <div class="card-body">
+        {% if analysis %}
+        <div class="analysis-grid">
+          {% if analysis.summary_short %}
+          <div class="analysis-box">
+            <div class="analysis-label">Resumen ejecutivo</div>
+            <div class="rich-copy">{{ analysis.summary_short }}</div>
+          </div>
+          {% endif %}
+          {% if analysis.question_resolved %}
+          <div class="analysis-box">
+            <div class="analysis-label">Problema o consulta resuelta</div>
+            <div class="rich-copy">{{ analysis.question_resolved }}</div>
+          </div>
+          {% endif %}
+          {% if analysis.holding_principal %}
+          <div class="analysis-box">
+            <div class="analysis-label">Criterio principal</div>
+            <div class="rich-copy">{{ analysis.holding_principal }}</div>
+          </div>
+          {% endif %}
+          {% if analysis.implicancia_practica %}
+          <div class="analysis-box">
+            <div class="analysis-label">Impacto pr&aacute;ctico</div>
+            <div class="rich-copy">{{ analysis.implicancia_practica }}</div>
+          </div>
+          {% endif %}
+          {% if analysis.summary_technical %}
+          <div class="analysis-box">
+            <div class="analysis-label">S&iacute;ntesis t&eacute;cnica</div>
+            <div class="rich-copy">{{ analysis.summary_technical }}</div>
+          </div>
+          {% endif %}
+          {% if analysis.evidence %}
+          <div class="analysis-box">
+            <div class="analysis-label">Evidencia textual</div>
+            <div class="evidence-list">
+              {% for item in analysis.evidence %}
+              <div class="evidence-box">
+                <div class="cita-label">{{ item.label or ('Cita ' ~ loop.index) }}</div>
+                <div class="rich-copy">{{ item.excerpt }}</div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+          <div class="analysis-meta">
+            {% if analysis.confidence %}<span class="badge {% if analysis.confidence == 'alta' %}success{% elif analysis.confidence == 'media' %}info{% else %}warning{% endif %}">Confianza {{ analysis.confidence }}</span>{% endif %}
+            {% if analysis.status %}<span class="badge">{{ analysis.status }}</span>{% endif %}
+            {% if analysis.model %}<span class="badge">{{ analysis.model }}</span>{% endif %}
+            {% if analysis.generated_at %}<span class="badge">Generado {{ analysis.generated_at[:19].replace('T', ' ') }}</span>{% endif %}
+          </div>
+          {% if analysis.notes %}
+          <div class="flash-inline">{{ analysis.notes }}</div>
+          {% endif %}
+        </div>
+        {% else %}
+        <div class="rich-copy">{{ doc.resumen_mostrable }}</div>
+        <div class="inline-actions" style="margin-top:16px;">
+          <button class="btn btn-primary" onclick="generarAnalisis(false)">Generar an&aacute;lisis</button>
+        </div>
+        <div class="flash-inline" style="margin-top:12px;">La s&iacute;ntesis inteligente se persiste por separado del documento can&oacute;nico y se genera solo con evidencia del propio documento.</div>
+        {% endif %}
+      </div>
     </section>
     {% endif %}
 
@@ -116,11 +190,11 @@
 
     {% if doc.articulos_clave %}
     <section class="card doc-section">
-      <div class="card-head"><div class="card-title">Articulos clave</div></div>
+      <div class="card-head"><div class="card-title">Referencias normativas</div></div>
       <div class="card-body">
         <div class="keywords">
           {% for articulo in doc.articulos_clave %}
-          <a class="keyword" href="/app/buscar?articulo={{ articulo|urlencode }}">{{ articulo }}</a>
+          <a class="keyword" href="/app/buscar?ley={{ articulo.cuerpo|urlencode }}&articulo={{ articulo.articulo|urlencode }}">{{ articulo.label }}</a>
           {% endfor %}
         </div>
       </div>
@@ -142,7 +216,7 @@
 
     {% if doc.contenido %}
     <section class="card doc-section">
-      <div class="card-head"><div class="card-title">{% if doc.tipo == 'judicial' %}Pronunciamiento completo{% else %}Texto extraido del documento{% endif %}</div></div>
+      <div class="card-head"><div class="card-title">{% if doc.tipo == 'judicial' %}Pronunciamiento completo{% else %}Texto extra&iacute;do del documento{% endif %}</div></div>
       <div class="card-body">
         {% if doc.tipo == 'judicial' %}
         <div class="rich-copy">{{ doc.contenido }}</div>
@@ -150,8 +224,8 @@
         {% if doc.pdf_url %}
         <div class="flash-inline" style="margin-bottom:14px;">Se recomienda abrir el documento en PDF para revisi&oacute;n completa. Esta vista muestra una previsualizaci&oacute;n del texto extra&iacute;do para lectura r&aacute;pida y verificaci&oacute;n.</div>
         {% endif %}
-        <div class="rich-copy text-preview">{{ doc.contenido[:12000] }}</div>
-        {% if doc.contenido|length > 12000 %}
+        <div class="rich-copy text-preview">{{ doc.preview_texto[:12000] }}</div>
+        {% if doc.preview_texto|length > 12000 %}
         <div class="flash-inline" style="margin-top:14px;">La previsualizaci&oacute;n se acota para mantener esta ficha legible. El documento contiene {{ doc.chars_texto or 0 }} caracteres extra&iacute;dos en total y su versi&oacute;n can&oacute;nica es el PDF local.</div>
         {% endif %}
         {% endif %}
@@ -274,6 +348,20 @@ async function guardarDocumentoCaso(){
     return;
   }
   alert('Documento guardado en el caso.');
+}
+
+async function generarAnalisis(force){
+  const response = await fetch('/api/documento/{{ doc.id }}/analysis/generar', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({force: !!force})
+  });
+  const data = await response.json();
+  if(!response.ok || !data.ok){
+    alert(data.error || 'No fue posible generar el analisis del documento.');
+    return;
+  }
+  location.reload();
 }
 
 cargarCitas();

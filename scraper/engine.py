@@ -23,6 +23,7 @@ from datetime import datetime, date
 from urllib.parse import urljoin
 import fitz  # PyMuPDF
 from pdf_layout import build_pdf_path
+from normativa_refs import detect_normative_bodies, detect_normative_references, exact_article_refs, parse_article_ref_list
 
 BASE    = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.path.join(BASE, 'data', 'sii_normativa.db')
@@ -330,29 +331,12 @@ def _descargar_circular_html(url_detalle, anio, doc_info):
         return None
 
 # ── Análisis ──────────────────────────────────────────────────────────────
-LEYES_MAP = {
-    'LIR':  [r'impuesto\s+a\s+la\s+renta', r'd\.?l\.?\s*824'],
-    'LIVS': [r'impuesto\s+a\s+las\s+ventas', r'd\.?l\.?\s*825'],
-    'CT':   [r'código\s+tributario', r'd\.?l\.?\s*830'],
-    'LTE':  [r'ley\s+de\s+timbres', r'decreto\s+ley\s+3\.?475'],
-    'LH':   [r'ley\s+16\.?271', r'ley\s+de\s+herencias'],
-    'LMT':  [r'ley\s+n[°o]?\s*21\.?210'],
-}
-
 def detectar_leyes(texto):
-    t = texto.lower()
-    return list({ley for ley, pats in LEYES_MAP.items() if any(re.search(p, t) for p in pats)})
+    return detect_normative_bodies(texto)
+
 
 def detectar_articulos(texto):
-    arts = []
-    for p in [r'artículos?\s+(\d+[\s°]*(?:bis|ter)?)', r'art\.\s+(\d+[\s°]*(?:bis|ter)?)']:
-        for m in re.finditer(p, texto, re.IGNORECASE):
-            a = re.sub(r'\s+', ' ', m.group(1).strip())
-            if len(a) < 30: arts.append(f"art. {a}")
-    seen = set(); result = []
-    for a in arts:
-        if a not in seen: seen.add(a); result.append(a)
-    return result[:30]
+    return exact_article_refs(detect_normative_references(texto))[:30]
 
 def extraer_fecha_texto(texto):
     MESES = {'enero':'01','febrero':'02','marzo':'03','abril':'04','mayo':'05',
@@ -420,46 +404,30 @@ def _json_list(value):
 
 def _indexar_articulos_conservador(conn, doc_id, leyes, articulos):
     leyes = [ley for ley in leyes if ley]
-    articulos = [art for art in articulos if art][:20]
+    exactos = exact_article_refs(articulos)[:20]
     conn.execute("DELETE FROM articulos_idx WHERE doc_id=?", (doc_id,))
     vistos = set()
 
-    if len(leyes) == 1:
-        ley = leyes[0]
-        if articulos:
-            for articulo in articulos:
-                key = (ley, articulo)
-                if key in vistos:
-                    continue
-                conn.execute(
-                    "INSERT OR IGNORE INTO articulos_idx(doc_id, ley, articulo) VALUES(?,?,?)",
-                    (doc_id, ley, articulo),
-                )
-                vistos.add(key)
-        else:
-            conn.execute(
-                "INSERT OR IGNORE INTO articulos_idx(doc_id, ley, articulo) VALUES(?,?,NULL)",
-                (doc_id, ley),
-            )
-        return
+    for ref in exactos:
+        key = (ref['cuerpo'], ref['articulo'])
+        if key in vistos:
+            continue
+        conn.execute(
+            "INSERT OR IGNORE INTO articulos_idx(doc_id, ley, articulo) VALUES(?,?,?)",
+            (doc_id, ref['cuerpo'], ref['articulo']),
+        )
+        vistos.add(key)
 
+    leyes_con_ref = {ref['cuerpo'] for ref in exactos if ref.get('cuerpo')}
     for ley in leyes:
+        if ley in leyes_con_ref:
+            continue
         key = (ley, None)
         if key in vistos:
             continue
         conn.execute(
             "INSERT OR IGNORE INTO articulos_idx(doc_id, ley, articulo) VALUES(?,?,NULL)",
             (doc_id, ley),
-        )
-        vistos.add(key)
-
-    for articulo in articulos:
-        key = (None, articulo)
-        if key in vistos:
-            continue
-        conn.execute(
-            "INSERT OR IGNORE INTO articulos_idx(doc_id, ley, articulo) VALUES(?,NULL,?)",
-            (doc_id, articulo),
         )
         vistos.add(key)
 
